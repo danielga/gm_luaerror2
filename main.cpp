@@ -147,6 +147,7 @@ bool CallErrorHook( GarrysMod::Lua::ILuaBase *lua, bool serverside, bool runtime
 					if( lua->PCall( 5, 1, 0 ) != 0 )
 					{
 						ConColorMsg( Color( 255, 0, 0, 255 ), "[LuaError hook error] %s\n", lua->GetString( ) );
+						lua->Pop( 1 );
 						return true;
 					}
 				}
@@ -155,6 +156,7 @@ bool CallErrorHook( GarrysMod::Lua::ILuaBase *lua, bool serverside, bool runtime
 					if( lua->PCall( 4, 1, 0 ) != 0 )
 					{
 						ConColorMsg( Color( 255, 0, 0, 255 ), "[LuaError hook error] %s\n", lua->GetString( ) );
+						lua->Pop( 1 );
 						return true;
 					}
 				}
@@ -209,7 +211,7 @@ int luaL_loadbufferx_d( lua_State *state, const char *buff, size_t size, const c
 			GarrysMod::Lua::ILuaBase *lua = luaList.Element( k );
 			if( lua != 0 && !CallErrorHook( lua, IsServer( LUA ), false, strerr, stack ) )
 			{
-				break;
+				return 0;
 			}
 		}
 	}
@@ -226,10 +228,9 @@ MologieDetours::Detour<AdvancedLuaErrorReporter_t> *AdvancedLuaErrorReporter_det
 AdvancedLuaErrorReporter_t AdvancedLuaErrorReporter = 0;
 int AdvancedLuaErrorReporter_d( lua_State *state )
 {
-	int rets = AdvancedLuaErrorReporter_detour->GetOriginalFunction( )( state );
-	if( rets > 0 && LUA->IsType( -1, GarrysMod::Lua::Type::STRING ) )
+	if( LUA->IsType( -1, GarrysMod::Lua::Type::STRING ) )
 	{
-		const char *strerr = LUA->GetString( -2 );
+		const char *strerr = LUA->GetString( -1 );
 
 		CUtlVector<lua_Debug> stack;
 		lua_Debug dbg = { };
@@ -251,20 +252,21 @@ int AdvancedLuaErrorReporter_d( lua_State *state )
 			GarrysMod::Lua::ILuaBase *lua = luaList.Element( k );
 			if( lua != 0 && !CallErrorHook( lua, IsServer( LUA ), true, strerr, stack ) )
 			{
-				break;
+				return 0;
 			}
 		}
 	}
 
-	return rets;
+	return AdvancedLuaErrorReporter_detour->GetOriginalFunction( )( state );
 }
+
+class CBaseEntity;
+class CBasePlayer;
 
 #if _WIN32
 #define Push_Entity_signature "\x55\x8b\xec\x83\xec\x14\x83\x3d\x00\x00\x00\x00\x00\x74\x00\x8b\x4d\x08"
 #define Push_Entity_mask "xxxxxxxx?????x?xxx"
 #endif
-class CBaseEntity;
-class CBasePlayer;
 typedef void ( *Push_Entity_t ) ( CBaseEntity *entity );
 Push_Entity_t Push_Entity;
 

@@ -1,12 +1,16 @@
 -- Change this variable to the path of your Garry's Mod module base include folder
-local GARRYSMOD_INCLUDES_PATH = "/home/daniel/Área de Trabalho/gmod-module-base/include" -- Linux
+--local GARRYSMOD_INCLUDES_PATH = "/home/daniel/Área de Trabalho/gmod-module-base/include" -- Linux
 --local GARRYSMOD_INCLUDES_PATH = "D:/garrysmod stuff/gmod-module-base/include" -- Windows
 
 -- Change this variable to the path of your SourceSDK folder
-local SOURCE_SDK_PATH = "/home/daniel/Área de Trabalho/SourceSDK" -- Linux
+--local SOURCE_SDK_PATH = "/home/daniel/Área de Trabalho/SourceSDK" -- Linux
 --local SOURCE_SDK_PATH = "D:/garrysmod stuff/SourceSDK" -- Windows
 
-solution("gm_luaerror")
+if not GARRYSMOD_INCLUDES_PATH or not SOURCE_SDK_PATH then
+	error("GARRYSMOD_INCLUDES_PATH or SOURCE_SDK_PATH not found!")
+end
+
+solution("gm_luaerror2")
 
 	language("C++")
 	location("Projects/" .. os.get() .. "-" .. _ACTION)
@@ -27,24 +31,34 @@ solution("gm_luaerror")
 
 	configuration("Release")
 		defines({"NDEBUG"})
-		flags({"Optimize", "Symbols"})
+		flags({"Optimize"})
 		targetdir("Projects/Release")
 		objdir("Projects/Intermediate")
 
-	project("gm_luaerror")
+	project("gm_luaerror2")
 		kind("SharedLib")
 		defines({"GAME_DLL", "GMMODULE"})
 		includedirs({SOURCE_SDK_PATH .. "/public", SOURCE_SDK_PATH .. "/public/tier0", SOURCE_SDK_PATH .. "/public/tier1", GARRYSMOD_INCLUDES_PATH})
 		links(lib_files)
 		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
 		vpaths({["Header files"] = {"**.h", "**.hxx", "**.hpp"}, ["Source files"] = {"**.c", "**.cxx", "**.cpp"}})
+		targetprefix("gmsv_") -- Just to remove prefixes like lib from Linux
+		targetname("luaerror2")
 		if os.is("windows") then
 			libdirs({SOURCE_SDK_PATH .. "/lib/public"})
 			links({"tier0", "tier1"})
+			targetsuffix("_win32")
+			postbuildcommands({"copy \"..\\Release\\gmsv_luaerror2_win32.dll\" \"..\\Release\\gmcl_luaerror2_win32.dll\""})
 		elseif os.is("linux") then
 			libdirs({"./"})
 			linkoptions({"-l:libtier0_srv.so", "-l:tier1_i486.a"})
+			targetsuffix("_linux")
+			targetextension(".dll") -- Derp Garry, WHY
+			postbuildcommands({"cp \"../Release/gmsv_luaerror2_linux.dll\" \"../Release/gmcl_luaerror2_linux.dll\""})
 		elseif os.is("macosx") then
 			libdirs({"./"})
 			linkoptions({"-l:libtier0.dylib", "-l:tier1_i486.a"})
+			targetsuffix("_mac")
+			targetextension(".dll") -- Derp Garry, WHY
+			postbuildcommands({"cp \"../Release/gmsv_luaerror2_mac.dll\" \"../Release/gmcl_luaerror2_mac.dll\""})
 		end

@@ -1,28 +1,41 @@
 #include <GarrysMod/Lua/Interface.h>
 #include <string>
-
 #include <utlvector.h>
 #include <Color.h>
-
 #include "MologieDetours/detours.h"
+#include "ILuaInterface.h"
+
 #if _WIN32
+//Commented as it isn't needed
 //#define WIN32_LEAN_AND_MEAN
 //#include <windows.h>
 #include "csimplescan.h"
+#define VOFFSET 0
 #elif __linux
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
+#include <interface.h>
+#define VOFFSET 1
 #elif __APPLE__
 #include <mach/task.h>
 #include <mach-o/dyld_images.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
+#include <interface.h>
+#define VOFFSET 1
 #endif
 
-static CUtlVector<GarrysMod::Lua::ILuaBase *> luaList;
+class CBaseEntity;
+class CBasePlayer;
+class CLuaGameCallback;
+
+struct CLuaError
+{
+	const char *data;
+};
 
 typedef struct lua_Debug
 {
@@ -40,24 +53,7 @@ typedef struct lua_Debug
 	int i_ci;
 } lua_Debug;
 
-bool IsServer( GarrysMod::Lua::ILuaBase *lua )
-{
-	lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
-	if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-	{
-		lua->GetField( -1, "SERVER" );
-		lua->Remove( -2 ); // Remove global table from stack
-		if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) && lua->GetBool( -1 ) )
-		{
-			lua->Pop( 1 );
-			return true;
-		}
-
-		lua->Pop( 1 );
-	}
-
-	return false;
-}
+ILuaInterface *lua = 0;
 
 /*
 #if _WIN32
@@ -77,30 +73,116 @@ lua_getstack_t lua_getstack = 0;
 typedef int ( *lua_getinfo_t ) ( lua_State *state, const char *what, lua_Debug *ar );
 lua_getinfo_t lua_getinfo = 0;
 
-bool CallErrorHook( GarrysMod::Lua::ILuaBase *lua, bool serverside, bool runtime, const char *error, CUtlVector<lua_Debug> &stack )
+#if LUAERROR_SERVER
+#if _WIN32
+#define Push_Entity_signature "\x55\x8b\xec\x83\xec\x14\x83\x3d\x00\x00\x00\x00\x00\x74\x00\x8b\x4d\x08"
+#define Push_Entity_mask "xxxxxxxx?????x?xxx"
+#endif
+typedef void ( *Push_Entity_t ) ( CBaseEntity *entity );
+Push_Entity_t Push_Entity;
+
+#if _WIN32
+#define HandleClientLuaError_signature "\x55\x8b\xec\x83\xec\x08\x8b\x0d\x00\x00\x00\x00\x8b\x11\x53\x56"
+#define HandleClientLuaError_mask "xxxxxxxx????xxxx"
+#endif
+typedef void ( __cdecl *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
+MologieDetours::Detour<HandleClientLuaError_t> *HandleClientLuaError_detour = 0;
+HandleClientLuaError_t HandleClientLuaError = 0;
+void __cdecl HandleClientLuaError_d( CBasePlayer *player, const char *error )
 {
 	lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
 	if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
 	{
 		lua->GetField( -1, "hook" );
-		lua->Remove( -2 ); // Remove global table from stack
 		if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
 		{
 			lua->GetField( -1, "Run" );
-			lua->Remove( -2 ); // Remove hook library table from stack
+			if( lua->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
+			{
+				lua->PushString( "ClientLuaError" );
+				Push_Entity( (CBaseEntity *)player );
+				lua->PushString( error );
+
+				if( lua->PCall( 3, 1, 0 ) != 0 )
+				{
+					ConColorMsg( Color( 255, 0, 0, 255 ), "[ClientLuaError hook error] %s\n", lua->GetString( ) );
+					lua->Pop( 3 );
+					return;
+				}
+
+				if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) && lua->GetBool( ) )
+				{
+					lua->Pop( 3 );
+					return;
+				}
+
+				lua->Pop( 1 );
+			}
+		}
+
+		lua->Pop( 1 );
+	}
+
+	lua->Pop( 1 );
+	return HandleClientLuaError_detour->GetOriginalFunction( )( player, error );
+}
+#endif
+
+#if _WIN32
+#define CLuaGameCallback__LuaError_signature "\x55\x8b\xec\x81\xec\x00\x00\x00\x00\x53\x56\x57\x33\xdb\x53\x89"
+#define CLuaGameCallback__LuaError_mask "xxxxx????xxxxxxx"
+#endif
+#if _WIN32
+typedef void ( __thiscall *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
+#else
+typedef void ( __cdecl *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
+#endif
+MologieDetours::Detour<CLuaGameCallback__LuaError_t> *CLuaGameCallback__LuaError_detour = 0;
+CLuaGameCallback__LuaError_t CLuaGameCallback__LuaError;
+#if _WIN32
+void __fastcall CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, void *fuckthis, CLuaError *error )
+#else
+void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError *error )
+#endif
+{
+	lua_State *state = lua->GetLuaState( );
+	//const char *strerr = (const char *)( ( *(unsigned int *)error ) + VOFFSET * 4 );
+	const char *strerr = error->data;
+	CUtlVector<lua_Debug> stack;
+	lua_Debug dbg = { };
+	int level = 1;
+	while( lua_getstack( state, level, &dbg ) == 1 )
+	{
+		if( lua_getinfo( state, "Slnu", &dbg ) == 0 )
+		{
+			break;
+		}
+
+		level++;
+		stack.AddToTail( dbg );
+		memset( &dbg, 0, sizeof( dbg ) );
+	}
+
+	int stacksize = stack.Count( );
+	lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
+	if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
+	{
+		lua->GetField( -1, "hook" );
+		if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
+		{
+			lua->GetField( -1, "Run" );
 			if( lua->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
 			{
 				lua->PushString( "LuaError" );
-				lua->PushBool( serverside );
-				lua->PushBool( runtime );
-				lua->PushString( error );
+				lua->PushBool( lua->IsServer( ) );
+				lua->PushString( strerr );
 
-				if( runtime )
+				if( stacksize > 0 )
 				{
 					lua->CreateTable( );
 					if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
 					{
-						for( int i = 0; i < stack.Count( ); i++ )
+						for( int i = 0; i < stacksize; ++i )
 						{
 							lua->PushNumber( (double)( i + 1 ) );
 							lua->CreateTable( );
@@ -144,181 +226,38 @@ bool CallErrorHook( GarrysMod::Lua::ILuaBase *lua, bool serverside, bool runtime
 						}
 					}
 
-					if( lua->PCall( 5, 1, 0 ) != 0 )
+					if( lua->PCall( 4, 1, 0 ) != 0 )
 					{
 						ConColorMsg( Color( 255, 0, 0, 255 ), "[LuaError hook error] %s\n", lua->GetString( ) );
-						lua->Pop( 1 );
-						return true;
+						lua->Pop( 3 );
+						return ( CLuaGameCallback__LuaError_detour->GetOriginalFunction( ) )( callback, error );
 					}
 				}
 				else
 				{
-					if( lua->PCall( 4, 1, 0 ) != 0 )
+					if( lua->PCall( 3, 1, 0 ) != 0 )
 					{
 						ConColorMsg( Color( 255, 0, 0, 255 ), "[LuaError hook error] %s\n", lua->GetString( ) );
-						lua->Pop( 1 );
-						return true;
+						lua->Pop( 3 );
+						return ( CLuaGameCallback__LuaError_detour->GetOriginalFunction( ) )( callback, error );
 					}
 				}
 
 				if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) && lua->GetBool( ) )
 				{
-					lua->Pop( 1 );
-					return false;
+					lua->Pop( 3 );
+					return;
 				}
 
 				lua->Pop( 1 );
 			}
 		}
+
+		lua->Pop( 1 );
 	}
 
-	return true;
-}
-
-/*
-#if _WIN32
-#define luaL_loadbufferx_signature "\x55\x8B\xEC\x83\xE4\xF8\x83\xEC\x78\x8B\x45\x0C\x8B\x4D\x10\x89"
-#define luaL_loadbufferx_mask "xxxxxxxxxxxxxxxx"
-#endif
-*/
-typedef int ( *luaL_loadbufferx_t ) ( lua_State *state, const char *buff, size_t size, const char *name, const char *mode );
-MologieDetours::Detour<luaL_loadbufferx_t> *luaL_loadbufferx_detour = 0;
-luaL_loadbufferx_t luaL_loadbufferx = 0;
-int luaL_loadbufferx_d( lua_State *state, const char *buff, size_t size, const char *name, const char *mode )
-{
-	int error = luaL_loadbufferx_detour->GetOriginalFunction( )( state, buff, size, name, mode );
-	if( error != 0 && LUA->IsType( -1, GarrysMod::Lua::Type::STRING ) )
-	{
-		const char *strerr = LUA->GetString( );
-
-		CUtlVector<lua_Debug> stack;
-		lua_Debug dbg = { };
-		int level = 1;
-		while( lua_getstack( state, level, &dbg ) == 1 )
-		{
-			if( lua_getinfo( state, "Slnu", &dbg ) == 0 )
-			{
-				break;
-			}
-
-			level++;
-			stack.AddToTail( dbg );
-			memset( &dbg, 0, sizeof( dbg ) );
-		}
-
-		for( int k = 0; k < luaList.Count( ); k++ )
-		{
-			GarrysMod::Lua::ILuaBase *lua = luaList.Element( k );
-			if( lua != 0 && !CallErrorHook( lua, IsServer( LUA ), false, strerr, stack ) )
-			{
-				return 0;
-			}
-		}
-	}
-
-	return error;
-}
-
-#if _WIN32
-#define AdvancedLuaErrorReporter_signature "\x55\x8b\xec\x56\x8b\x75\x08\x6a\x01\x56\xe8\x00\x00\x00\x00\x83\xc4\x08"
-#define AdvancedLuaErrorReporter_mask "xxxxxxxxxxx????xxx"
-#endif
-typedef int ( *AdvancedLuaErrorReporter_t ) ( lua_State *state );
-MologieDetours::Detour<AdvancedLuaErrorReporter_t> *AdvancedLuaErrorReporter_detour = 0;
-AdvancedLuaErrorReporter_t AdvancedLuaErrorReporter = 0;
-int AdvancedLuaErrorReporter_d( lua_State *state )
-{
-	if( LUA->IsType( -1, GarrysMod::Lua::Type::STRING ) )
-	{
-		const char *strerr = LUA->GetString( -1 );
-
-		CUtlVector<lua_Debug> stack;
-		lua_Debug dbg = { };
-		int level = 1;
-		while( lua_getstack( state, level, &dbg ) == 1 )
-		{
-			if( lua_getinfo( state, "Slnu", &dbg ) == 0 )
-			{
-				break;
-			}
-
-			level++;
-			stack.AddToTail( dbg );
-			memset( &dbg, 0, sizeof( dbg ) );
-		}
-
-		for( int k = 0; k < luaList.Count( ); k++ )
-		{
-			GarrysMod::Lua::ILuaBase *lua = luaList.Element( k );
-			if( lua != 0 && !CallErrorHook( lua, IsServer( LUA ), true, strerr, stack ) )
-			{
-				return 0;
-			}
-		}
-	}
-
-	return AdvancedLuaErrorReporter_detour->GetOriginalFunction( )( state );
-}
-
-class CBaseEntity;
-class CBasePlayer;
-
-#if _WIN32
-#define Push_Entity_signature "\x55\x8b\xec\x83\xec\x14\x83\x3d\x00\x00\x00\x00\x00\x74\x00\x8b\x4d\x08"
-#define Push_Entity_mask "xxxxxxxx?????x?xxx"
-#endif
-typedef void ( *Push_Entity_t ) ( CBaseEntity *entity );
-Push_Entity_t Push_Entity;
-
-#if _WIN32
-#define HandleClientLuaError_signature "\x55\x8b\xec\x83\xec\x08\x8b\x0d\x00\x00\x00\x00\x8b\x11\x53\x56"
-#define HandleClientLuaError_mask "xxxxxxxx????xxxx"
-#endif
-typedef int ( *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
-MologieDetours::Detour<HandleClientLuaError_t> *HandleClientLuaError_detour = 0;
-HandleClientLuaError_t HandleClientLuaError = 0;
-int HandleClientLuaError_d( CBasePlayer *player, const char *error )
-{
-	for( int k = 0; k < luaList.Count( ); k++ )
-	{
-		GarrysMod::Lua::ILuaBase *lua = luaList.Element( k );
-		if( lua != 0 && IsServer( lua ) )
-		{
-			lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
-			if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-			{
-				lua->GetField( -1, "hook" );
-				lua->Remove( -2 ); // Remove global table from stack
-				if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-				{
-					lua->GetField( -1, "Run" );
-					lua->Remove( -2 ); // Remove hook library table from stack
-					if( lua->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
-					{
-						lua->PushString( "ClientLuaError" );
-						Push_Entity( (CBaseEntity *)player );
-						lua->PushString( error );
-
-						if( lua->PCall( 3, 1, 0 ) != 0 )
-						{
-							ConColorMsg( Color( 255, 0, 0, 255 ), "[ClientLuaError hook error] %s\n", lua->GetString( ) );
-							return 0;
-						}
-
-						if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) && lua->GetBool( ) )
-						{
-							lua->Pop( 1 );
-							return 0;
-						}
-
-						lua->Pop( 1 );
-					}
-				}
-			}
-		}
-	}
-
-	return HandleClientLuaError_detour->GetOriginalFunction( )( player, error );
+	lua->Pop( 1 );
+	return ( CLuaGameCallback__LuaError_detour->GetOriginalFunction( ) )( callback, error );
 }
 
 #ifndef _WIN32
@@ -487,251 +426,248 @@ void *FindFunctionsTheHardWay( void *handle, const char *symbol )   // Totally n
 }
 #endif
 
+#if _WIN32
+#define snprintf _snprintf
+#endif
+
+#define LuaError( error ) _LuaError( state, error ); return 0;
+int _LuaError( lua_State *state, const char *error )
+{
+	static char temp_error[300];
+	snprintf( temp_error, sizeof( temp_error ), "Failed to load LuaError. '%s' Contact me in Facepunch (danielga) or Steam (tuestu1) with this error.", error );
+	LUA->ThrowError( temp_error );
+	return 0;
+}
+
 GMOD_MODULE_OPEN( )
 {
-	if( luaList.Count( ) == 0 )
-	{
+	lua = (ILuaInterface *)LUA;
+
 #if _WIN32
-		HMODULE lua_shared = 0;
-		BOOL success = GetModuleHandleEx( 0, "lua_shared.dll", &lua_shared );
-		CSimpleScan lua_shared_scan;
-		if( success == TRUE && lua_shared_scan.SetDLL( "lua_shared.dll" ) )
+	HMODULE lua_shared = 0;
+	//CSimpleScan lua_shared_scan;
+	if( GetModuleHandleEx( 0, "lua_shared.dll", &lua_shared ) == TRUE )
+	{
+		/*
+		if( !lua_shared_scan.FindFunction( lua_getstack_signature, lua_getstack_mask, (void **)&lua_getstack ) )
 		{
-			/*
-			if( !lua_shared_scan.FindFunction( luaL_loadbufferx_signature, luaL_loadbufferx_mask, &(void *&)luaL_loadbufferx ) )
-			{
-				Msg( "[LuaError] Unable to detour function luaL_loadbufferx.\n" );
-			}
-
-			if( !lua_shared_scan.FindFunction( lua_getstack_signature, lua_getstack_mask, &(void *&)lua_getstack ) )
-			{
-				Msg( "[LuaError] Unable to scan function lua_getstack.\n" );
-			}
-
-			if( !lua_shared_scan.FindFunction( lua_getinfo_signature, lua_getinfo_mask, &(void *&)lua_getinfo ) )
-			{
-				Msg( "[LuaError] Unable to scan function lua_getinfo.\n" );
-			}
-			*/
-
-			if( ( lua_getstack = (lua_getstack_t)GetProcAddress( lua_shared, "lua_getstack" ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to scan function lua_getstack.\n" );
-			}
-
-			if( ( lua_getinfo = (lua_getinfo_t)GetProcAddress( lua_shared, "lua_getinfo" ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to scan function lua_getinfo.\n" );
-			}
-
-			if( ( luaL_loadbufferx = (luaL_loadbufferx_t)GetProcAddress( lua_shared, "luaL_loadbufferx" ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to detour function luaL_loadbufferx.\n" );
-			}
-
-			if( !lua_shared_scan.FindFunction( AdvancedLuaErrorReporter_signature, AdvancedLuaErrorReporter_mask, &(void *&)AdvancedLuaErrorReporter ) )
-			{
-				Msg( "[LuaError] Unable to detour function AdvancedLuaErrorReporter.\n" );
-			}
-		}
-		else
-		{
-			Msg( "[LuaError] Couldn't get lua_shared.dll factory. Scanning and detouring failed.\n" );
+			LuaError( "Unable to find function lua_getstack." );
 		}
 
-		LUA->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
-		if( LUA->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
+		if( !lua_shared_scan.FindFunction( lua_getinfo_signature, lua_getinfo_mask, (void **)&lua_getinfo ) )
 		{
-			LUA->GetField( -1, "SERVER" );
-			LUA->Remove( -2 ); // Remove global table from stack
-			if( LUA->IsType( -1, GarrysMod::Lua::Type::BOOL ) && LUA->GetBool( -1 ) )
-			{
-				CSimpleScan server_scan;
-				if( server_scan.SetDLL( "server.dll" ) )
-				{
-					if( !server_scan.FindFunction( HandleClientLuaError_signature, HandleClientLuaError_mask, &(void *&)HandleClientLuaError ) )
-					{
-						Msg( "[LuaError] Unable to detour function HandleClientLuaError.\n" );
-					}
-
-					if( !server_scan.FindFunction( Push_Entity_signature, Push_Entity_mask, &(void *&)Push_Entity ) )
-					{
-						Msg( "[LuaError] Unable to detour function Push_Entity.\n" );
-					}
-				}
-				else
-				{
-					Msg( "[LuaError] Couldn't get server.dll factory. Scanning and detouring failed.\n" );
-				}
-			}
-
-			LUA->Pop( 1 );
+			LuaError( "Unable to find function lua_getinfo." );
 		}
+		*/
 
-		if( lua_shared != 0 )
+		if( ( lua_getstack = (lua_getstack_t)GetProcAddress( lua_shared, "_lua_getstack" ) ) == 0 )
 		{
 			FreeLibrary( lua_shared );
 			lua_shared = 0;
+			LuaError( "Unable to find function lua_getstack." );
 		}
+
+		if( ( lua_getinfo = (lua_getinfo_t)GetProcAddress( lua_shared, "lua_getinfo" ) ) == 0 )
+		{
+			FreeLibrary( lua_shared );
+			lua_shared = 0;
+			LuaError( "Unable to find function lua_getinfo." );
+		}
+	}
+	else
+	{
+		LuaError( "Couldn't open lua_shared.dll." );
+	}
+
+	if( lua_shared != 0 )
+	{
+		FreeLibrary( lua_shared );
+		lua_shared = 0;
+	}
+
+#if LUAERROR_SERVER
+	CSimpleScan server_scan;
+	if( server_scan.SetDLL( "server.dll" ) )
+	{
+		if( !server_scan.FindFunction( HandleClientLuaError_signature, HandleClientLuaError_mask, (void **)&HandleClientLuaError ) )
+		{
+			LuaError( "Unable to detour function HandleClientLuaError." );
+		}
+
+		if( !server_scan.FindFunction( Push_Entity_signature, Push_Entity_mask, (void **)&Push_Entity ) )
+		{
+			LuaError( "Unable to find function Push_Entity." );
+		}
+
+		if( !server_scan.FindFunction( CLuaGameCallback__LuaError_signature, CLuaGameCallback__LuaError_mask, (void **)&CLuaGameCallback__LuaError ) )
+		{
+			LuaError( "Unable to detour function CLuaGameCallback::LuaError (server.dll)." );
+		}
+	}
+	else
+	{
+		LuaError( "Couldn't open server.dll." );
+	}
+#elif LUAERROR_CLIENT
+	CSimpleScan client_scan;
+	if( client_scan.SetDLL( "client.dll" ) )
+	{
+		if( !client_scan.FindFunction( CLuaGameCallback__LuaError_signature, CLuaGameCallback__LuaError_mask, (void **)&CLuaGameCallback__LuaError ) )
+		{
+			LuaError( "Unable to detour function CLuaGameCallback::LuaError (client.dll)." );
+		}
+	}
+	else
+	{
+		LuaError( "Couldn't open client.dll." );
+	}
+#endif
 #else
 #define garrysmod_bin_path "garrysmod/bin/" // This combined with lua_shared_file should ALWAYS work
 											// unless some numbnut likes to change folder names for fun
 #if __linux
 #define lua_shared_file "lua_shared_srv.so"
 #define server_file "server_srv.so"
-#define lua_getstack_name "lua_getstack"
-#define lua_getinfo_name "lua_getinfo"
-#define luaL_loadbufferx_name "luaL_loadbufferx"
-#define AdvancedLuaErrorReporter_name "_Z24AdvancedLuaErrorReporterP9lua_State"
-#define HandleClientLuaError_name "_Z20HandleClientLuaErrorP11CBasePlayerPKc"
-#define Push_Entity_name "_Z11Push_EntityP11CBaseEntity"
+#define client_file "client_srv.so"
+#define FUNC_NAME_PREFIX ""
 #elif __APPLE__
-#define lua_shared_file garrysmod_bin_path "lua_shared.dylib"
+#define lua_shared_file "lua_shared.dylib"
 #define server_file "server.dylib"
-#define lua_getstack_name "_lua_getstack"
-#define lua_getinfo_name "_lua_getinfo"
-#define luaL_loadbufferx_name "_luaL_loadbufferx"
-#define AdvancedLuaErrorReporter_name "__Z24AdvancedLuaErrorReporterP9lua_State"
-#define HandleClientLuaError_name "__Z20HandleClientLuaErrorP11CBasePlayerPKc"
-#define Push_Entity_name "__Z11Push_EntityP11CBaseEntity"
+#define client_file "client.dylib"
+#define FUNC_NAME_PREFIX "_"
 
-		Gestalt( gestaltSystemVersionMajor, &m_OSXMajor );
-		Gestalt( gestaltSystemVersionMinor, &m_OSXMinor );
+	Gestalt( gestaltSystemVersionMajor, &m_OSXMajor );
+	Gestalt( gestaltSystemVersionMinor, &m_OSXMinor );
 
-		if( ( m_OSXMajor == 10 && m_OSXMinor >= 6 ) || m_OSXMajor > 10 )
-		{
-			task_dyld_info_data_t dyld_info;
-			mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
-			task_info( mach_task_self( ), TASK_DYLD_INFO, (task_info_t)&dyld_info, &count );
-			m_ImageList = (struct dyld_all_image_infos *)dyld_info.all_image_info_addr;
-		}
-		else
-		{
-			struct nlist list[2];
-			memset( list, 0, sizeof( list ) );
-			list[0].n_un.n_name = (char *)"_dyld_all_image_infos";
-			nlist( "/usr/lib/dyld", list );
-			m_ImageList = (struct dyld_all_image_infos *)list[0].n_value;
-		}
+	if( ( m_OSXMajor == 10 && m_OSXMinor >= 6 ) || m_OSXMajor > 10 )
+	{
+		task_dyld_info_data_t dyld_info;
+		mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;
+		task_info( mach_task_self( ), TASK_DYLD_INFO, (task_info_t)&dyld_info, &count );
+		m_ImageList = (struct dyld_all_image_infos *)dyld_info.all_image_info_addr;
+	}
+	else
+	{
+		struct nlist list[2];
+		memset( list, 0, sizeof( list ) );
+		list[0].n_un.n_name = (char *)"_dyld_all_image_infos";
+		nlist( "/usr/lib/dyld", list );
+		m_ImageList = (struct dyld_all_image_infos *)list[0].n_value;
+	}
 #endif
+#define lua_getstack_name FUNC_NAME_PREFIX "lua_getstack"
+#define lua_getinfo_name FUNC_NAME_PREFIX "lua_getinfo"
+#define HandleClientLuaError_name FUNC_NAME_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc"
+#define Push_Entity_name FUNC_NAME_PREFIX "_Z11Push_EntityP11CBaseEntity"
+#define CLuaGameCallback__LuaError_name FUNC_NAME_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError"
 
-		void *lua_shared = dlopen( garrysmod_bin_path lua_shared_file, RTLD_NOW | RTLD_LOCAL );
-		if( lua_shared != 0 )
-		{
-			if( ( lua_getstack = (lua_getstack_t)dlsym( lua_shared, lua_getstack_name ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to scan function lua_getstack.\n" );
-			}
-
-			if( ( lua_getinfo = (lua_getinfo_t)dlsym( lua_shared, lua_getinfo_name ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to scan function lua_getinfo.\n" );
-			}
-
-			if( ( luaL_loadbufferx = (luaL_loadbufferx_t)dlsym( lua_shared, luaL_loadbufferx_name ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to detour function luaL_loadbufferx.\n" );
-			}
-
-			if( ( AdvancedLuaErrorReporter = (AdvancedLuaErrorReporter_t)FindFunctionsTheHardWay( lua_shared, AdvancedLuaErrorReporter_name ) ) == 0 )
-			{
-				Msg( "[LuaError] Unable to detour function AdvancedLuaErrorReporter.\n" );
-			}
-		}
-		else
-		{
-			Msg( "[LuaError] Couldn't open " lua_shared_file " file. Scanning and detouring failed.\n" );
-		}
-
-		LUA->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
-		if( LUA->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-		{
-			LUA->GetField( -1, "SERVER" );
-			LUA->Remove( -2 ); // Remove global table from stack
-			if( LUA->IsType( -1, GarrysMod::Lua::Type::BOOL ) && LUA->GetBool( -1 ) )
-			{
-				void *server = dlopen( garrysmod_bin_path server_file, RTLD_NOW | RTLD_LOCAL );
-				if( server != 0 )
-				{
-					if( ( HandleClientLuaError = (HandleClientLuaError_t)FindFunctionsTheHardWay( server, HandleClientLuaError_name ) ) == 0 )
-					{
-						Msg( "[LuaError] Unable to scan function HandleClientLuaError.\n" );
-					}
-
-					if( ( Push_Entity = (Push_Entity_t)FindFunctionsTheHardWay( server, Push_Entity_name ) ) == 0 )
-					{
-						Msg( "[LuaError] Unable to scan function Push_Entity.\n" );
-					}
-				}
-				else
-				{
-					Msg( "[LuaError] Couldn't open " server_file " file. Scanning and detouring failed.\n" );
-				}
-
-				if( server != 0 )
-				{
-					dlclose( server );
-					server = 0;
-				}
-			}
-
-			LUA->Pop( 1 );
-		}
-
-		if( lua_shared != 0 )
+	void *lua_shared = dlopen( garrysmod_bin_path lua_shared_file, RTLD_NOW | RTLD_LOCAL );
+	if( lua_shared != 0 )
+	{
+		if( ( lua_getstack = (lua_getstack_t)dlsym( lua_shared, lua_getstack_name ) ) == 0 )
 		{
 			dlclose( lua_shared );
 			lua_shared = 0;
+			LuaError( "Unable to find function lua_getstack." );
 		}
+
+		if( ( lua_getinfo = (lua_getinfo_t)dlsym( lua_shared, lua_getinfo_name ) ) == 0 )
+		{
+			dlclose( lua_shared );
+			lua_shared = 0;
+			LuaError( "Unable to find function lua_getinfo." );
+		}
+	}
+	else
+	{
+		LuaError( "Couldn't open " lua_shared_file " file." );
+	}
+
+	if( lua_shared != 0 )
+	{
+		dlclose( lua_shared );
+		lua_shared = 0;
+	}
+
+#if LUAERROR_SERVER
+	void *server = dlopen( garrysmod_bin_path server_file, RTLD_NOW | RTLD_LOCAL );
+	if( server != 0 )
+	{
+		if( ( HandleClientLuaError = (HandleClientLuaError_t)FindFunctionsTheHardWay( server, HandleClientLuaError_name ) ) == 0 )
+		{
+			dlclose( server );
+			server = 0;
+			LuaError( "Unable to detour function HandleClientLuaError." );
+		}
+
+		if( ( Push_Entity = (Push_Entity_t)FindFunctionsTheHardWay( server, Push_Entity_name ) ) == 0 )
+		{
+			dlclose( server );
+			server = 0;
+			LuaError( "Unable to find function Push_Entity." );
+		}
+
+		if( ( CLuaGameCallback__LuaError = (CLuaGameCallback__LuaError_t)FindFunctionsTheHardWay( server, CLuaGameCallback__LuaError_name ) ) == 0 )
+		{
+			dlclose( server );
+			server = 0;
+			LuaError( "Unable to detour function CLuaGameCallback::LuaError (" server_file ")." );
+		}
+	}
+	else
+	{
+		LuaError( "Couldn't open " server_file " file." );
+	}
+
+	if( server != 0 )
+	{
+		dlclose( server );
+		server = 0;
+	}
+#elif LUAERROR_CLIENT
+	void *client = dlopen( garrysmod_bin_path client_file, RTLD_NOW | RTLD_LOCAL );
+	if( client != 0 )
+	{
+		if( ( CLuaGameCallback__LuaError = (CLuaGameCallback__LuaError_t)FindFunctionsTheHardWay( client, CLuaGameCallback__LuaError_name ) ) == 0 )
+		{
+			dlclose( client );
+			client = 0;
+			LuaError( "Unable to detour function CLuaGameCallback__LuaError  (" client_file ")." );
+		}
+	}
+	else
+	{
+		LuaError( "Couldn't open " client_file " file." );
+	}
+
+	if( client != 0 )
+	{
+		dlclose( client );
+		client = 0;
+	}
+#endif
 #endif
 
-		if( luaL_loadbufferx != 0 )
-		{
-			luaL_loadbufferx_detour = new MologieDetours::Detour<luaL_loadbufferx_t>( luaL_loadbufferx, luaL_loadbufferx_d );
-		}
-
-		if( AdvancedLuaErrorReporter != 0 )
-		{
-			AdvancedLuaErrorReporter_detour = new MologieDetours::Detour<AdvancedLuaErrorReporter_t>( AdvancedLuaErrorReporter, AdvancedLuaErrorReporter_d );
-		}
-
-		if( HandleClientLuaError != 0 )
-		{
-			HandleClientLuaError_detour = new MologieDetours::Detour<HandleClientLuaError_t>( HandleClientLuaError, HandleClientLuaError_d );
-		}
-	}
-
-	if( !luaList.HasElement( LUA ) )
-	{
-		luaList.AddToTail( LUA );
-	}
-
+	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully loaded. Created by Daniel." );
 	return 0;
 }
 
 GMOD_MODULE_CLOSE( )
 {
-	luaList.FindAndRemove( LUA );
-	if( luaList.Count( ) == 0 )
+#if LUAERROR_SERVER
+	if( HandleClientLuaError_detour != 0 )
 	{
-		if( luaL_loadbufferx_detour != 0 )
-		{
-			delete luaL_loadbufferx_detour;
-			luaL_loadbufferx_detour = 0;
-		}
+		delete HandleClientLuaError_detour;
+		HandleClientLuaError_detour = 0;
+	}
+#endif
 
-		if( AdvancedLuaErrorReporter_detour != 0 )
-		{
-			delete AdvancedLuaErrorReporter_detour;
-			AdvancedLuaErrorReporter_detour = 0;
-		}
-
-		if( HandleClientLuaError_detour != 0 )
-		{
-			delete HandleClientLuaError_detour;
-			HandleClientLuaError_detour = 0;
-		}
+	if( CLuaGameCallback__LuaError_detour != 0 )
+	{
+		delete CLuaGameCallback__LuaError_detour;
+		CLuaGameCallback__LuaError_detour = 0;
 	}
 
+	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully unloaded. Thank you for using LuaError. Created by Daniel." );
 	return 0;
 }

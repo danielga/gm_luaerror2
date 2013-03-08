@@ -35,9 +35,9 @@ solution("gm_luaerror2")
 		targetdir("Projects/Release")
 		objdir("Projects/Intermediate")
 
-	project("gm_luaerror2")
+	project("gmsv_luaerror2")
 		kind("SharedLib")
-		defines({"GAME_DLL", "GMMODULE"})
+		defines({"LUAERROR_SERVER", "GAME_DLL", "GMMODULE"})
 		includedirs({SOURCE_SDK_PATH .. "/public", SOURCE_SDK_PATH .. "/public/tier0", SOURCE_SDK_PATH .. "/public/tier1", GARRYSMOD_INCLUDES_PATH})
 		links(lib_files)
 		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
@@ -48,17 +48,39 @@ solution("gm_luaerror2")
 			libdirs({SOURCE_SDK_PATH .. "/lib/public"})
 			links({"tier0", "tier1"})
 			targetsuffix("_win32")
-			postbuildcommands({"copy \"..\\Release\\gmsv_luaerror2_win32.dll\" \"..\\Release\\gmcl_luaerror2_win32.dll\""})
 		elseif os.is("linux") then
 			libdirs({"./"})
 			linkoptions({"-l:libtier0_srv.so", "-l:tier1_i486.a"})
 			targetsuffix("_linux")
 			targetextension(".dll") -- Derp Garry, WHY
-			postbuildcommands({"cp \"../Release/gmsv_luaerror2_linux.dll\" \"../Release/gmcl_luaerror2_linux.dll\""})
 		elseif os.is("macosx") then
 			libdirs({"./"})
 			linkoptions({"-l:libtier0.dylib", "-l:tier1_i486.a"})
 			targetsuffix("_mac")
 			targetextension(".dll") -- Derp Garry, WHY
-			postbuildcommands({"cp \"../Release/gmsv_luaerror2_mac.dll\" \"../Release/gmcl_luaerror2_mac.dll\""})
+		end
+
+	project("gmcl_luaerror2")
+		kind("SharedLib")
+		defines({"LUAERROR_CLIENT", "GAME_DLL", "GMMODULE"})
+		includedirs({SOURCE_SDK_PATH .. "/public", SOURCE_SDK_PATH .. "/public/tier0", SOURCE_SDK_PATH .. "/public/tier1", GARRYSMOD_INCLUDES_PATH})
+		links(lib_files)
+		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
+		vpaths({["Header files"] = {"**.h", "**.hxx", "**.hpp"}, ["Source files"] = {"**.c", "**.cxx", "**.cpp"}})
+		targetprefix("gmcl_") -- Just to remove prefixes like lib from Linux
+		targetname("luaerror2")
+		if os.is("windows") then
+			libdirs({SOURCE_SDK_PATH .. "/lib/public"})
+			links({"tier0", "tier1"})
+			targetsuffix("_win32")
+		elseif os.is("linux") then
+			libdirs({"./"})
+			linkoptions({"-l:libtier0_srv.so", "-l:tier1_i486.a"})
+			targetsuffix("_linux")
+			targetextension(".dll") -- Derp Garry, WHY
+		elseif os.is("macosx") then
+			libdirs({"./"})
+			linkoptions({"-l:libtier0.dylib", "-l:tier1_i486.a"})
+			targetsuffix("_mac")
+			targetextension(".dll") -- Derp Garry, WHY
 		end

@@ -460,7 +460,7 @@ GMOD_MODULE_OPEN( )
 		}
 		*/
 
-		if( ( lua_getstack = (lua_getstack_t)GetProcAddress( lua_shared, "_lua_getstack" ) ) == 0 )
+		if( ( lua_getstack = (lua_getstack_t)GetProcAddress( lua_shared, "lua_getstack" ) ) == 0 )
 		{
 			FreeLibrary( lua_shared );
 			lua_shared = 0;

@@ -648,6 +648,18 @@ GMOD_MODULE_OPEN( )
 #endif
 #endif
 
+#if LUAERROR_SERVER
+	if( HandleClientLuaError != 0 )
+	{
+		HandleClientLuaError_detour = new MologieDetours::Detour<HandleClientLuaError_t>( HandleClientLuaError, HandleClientLuaError_d );
+	}
+#endif
+
+	if( CLuaGameCallback__LuaError != 0 )
+	{
+		CLuaGameCallback__LuaError_detour = new MologieDetours::Detour<CLuaGameCallback__LuaError_t>( CLuaGameCallback__LuaError, (CLuaGameCallback__LuaError_t)CLuaGameCallback__LuaError_d );
+	}
+
 	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully loaded. Created by Daniel." );
 	return 0;
 }

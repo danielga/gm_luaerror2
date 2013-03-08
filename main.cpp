@@ -660,7 +660,7 @@ GMOD_MODULE_OPEN( )
 		CLuaGameCallback__LuaError_detour = new MologieDetours::Detour<CLuaGameCallback__LuaError_t>( CLuaGameCallback__LuaError, (CLuaGameCallback__LuaError_t)CLuaGameCallback__LuaError_d );
 	}
 
-	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully loaded. Created by Daniel." );
+	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully loaded. Created by Daniel.\n" );
 	return 0;
 }
 
@@ -680,6 +680,6 @@ GMOD_MODULE_CLOSE( )
 		CLuaGameCallback__LuaError_detour = 0;
 	}
 
-	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully unloaded. Thank you for using LuaError. Created by Daniel." );
+	ConColorMsg( Color( 0, 255, 0, 255 ), "[LuaError] Successfully unloaded. Thank you for using LuaError. Created by Daniel.\n" );
 	return 0;
 }

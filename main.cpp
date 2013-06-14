@@ -1,14 +1,13 @@
 #include <GarrysMod/Lua/Interface.h>
+#include <GarrysMod/Lua/LuaInterface.h>
 #include <string>
 #include <utlvector.h>
 #include <Color.h>
 #include "MologieDetours/detours.h"
-#include "ILuaInterface.h"
 
 #if _WIN32
-//Commented as it isn't needed
-//#define WIN32_LEAN_AND_MEAN
-//#include <windows.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include "csimplescan.h"
 #define VOFFSET 0
 #elif __linux
@@ -37,41 +36,7 @@ struct CLuaError
 	const char *data;
 };
 
-typedef struct lua_Debug
-{
-	int event;
-	const char *name;			/* (n) */
-	const char *namewhat;		/* (n) */
-	const char *what;			/* (S) */
-	const char *source;			/* (S) */
-	int currentline;			/* (l) */
-	int nups;					/* (u) number of upvalues */
-	int linedefined;			/* (S) */
-	int lastlinedefined;		/* (S) */
-	char short_src[512];		/* (S) */
-	/* private part */
-	int i_ci;
-} lua_Debug;
-
-ILuaInterface *lua = 0;
-
-/*
-#if _WIN32
-#define lua_getstack_signature "\x51\x56\x8b\x74\x24\x10\x57\x8b\x7c\x24\x10\x8d\x44\x24\x08\x50"
-#define lua_getstack_mask "xxxxxxxxxxxxxxxx"
-#endif
-*/
-typedef int ( *lua_getstack_t ) ( lua_State *state, int level, lua_Debug *ar );
-lua_getstack_t lua_getstack = 0;
-
-/*
-#if _WIN32
-#define lua_getinfo_signature "\x8b\x44\x24\x0c\x8b\x4c\x24\x08\x8b\x54\x24\x04\x6a\x00\x50\x51"
-#define lua_getinfo_mask "xxxxxxxxxxxxxxxx"
-#endif
-*/
-typedef int ( *lua_getinfo_t ) ( lua_State *state, const char *what, lua_Debug *ar );
-lua_getinfo_t lua_getinfo = 0;
+GarrysMod::Lua::ILuaInterface *lua = 0;
 
 #if LUAERROR_SERVER
 #if _WIN32
@@ -131,8 +96,6 @@ void __cdecl HandleClientLuaError_d( CBasePlayer *player, const char *error )
 #if _WIN32
 #define CLuaGameCallback__LuaError_signature "\x55\x8b\xec\x81\xec\x00\x00\x00\x00\x53\x56\x57\x33\xdb\x53\x89"
 #define CLuaGameCallback__LuaError_mask "xxxxx????xxxxxxx"
-#endif
-#if _WIN32
 typedef void ( __thiscall *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
 #else
 typedef void ( __cdecl *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
@@ -145,15 +108,13 @@ void __fastcall CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, void *
 void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError *error )
 #endif
 {
-	lua_State *state = lua->GetLuaState( );
-	//const char *strerr = (const char *)( ( *(unsigned int *)error ) + VOFFSET * 4 );
 	const char *strerr = error->data;
 	CUtlVector<lua_Debug> stack;
 	lua_Debug dbg = { };
 	int level = 1;
-	while( lua_getstack( state, level, &dbg ) == 1 )
+	while( lua->GetStack( level, &dbg ) == 1 )
 	{
-		if( lua_getinfo( state, "Slnu", &dbg ) == 0 )
+		if( lua->GetInfo( "Slnu", &dbg ) == 0 )
 		{
 			break;
 		}
@@ -441,51 +402,10 @@ int _LuaError( lua_State *state, const char *error )
 
 GMOD_MODULE_OPEN( )
 {
-	lua = (ILuaInterface *)LUA;
+	lua = (GarrysMod::Lua::ILuaInterface *)LUA;
 
-#if _WIN32
-	HMODULE lua_shared = 0;
-	//CSimpleScan lua_shared_scan;
-	if( GetModuleHandleEx( 0, "lua_shared.dll", &lua_shared ) == TRUE )
-	{
-		/*
-		if( !lua_shared_scan.FindFunction( lua_getstack_signature, lua_getstack_mask, (void **)&lua_getstack ) )
-		{
-			LuaError( "Unable to find function lua_getstack." );
-		}
-
-		if( !lua_shared_scan.FindFunction( lua_getinfo_signature, lua_getinfo_mask, (void **)&lua_getinfo ) )
-		{
-			LuaError( "Unable to find function lua_getinfo." );
-		}
-		*/
-
-		if( ( lua_getstack = (lua_getstack_t)GetProcAddress( lua_shared, "lua_getstack" ) ) == 0 )
-		{
-			FreeLibrary( lua_shared );
-			lua_shared = 0;
-			LuaError( "Unable to find function lua_getstack." );
-		}
-
-		if( ( lua_getinfo = (lua_getinfo_t)GetProcAddress( lua_shared, "lua_getinfo" ) ) == 0 )
-		{
-			FreeLibrary( lua_shared );
-			lua_shared = 0;
-			LuaError( "Unable to find function lua_getinfo." );
-		}
-	}
-	else
-	{
-		LuaError( "Couldn't open lua_shared.dll." );
-	}
-
-	if( lua_shared != 0 )
-	{
-		FreeLibrary( lua_shared );
-		lua_shared = 0;
-	}
-
-#if LUAERROR_SERVER
+#if defined _WIN32
+#if defined LUAERROR_SERVER
 	CSimpleScan server_scan;
 	if( server_scan.SetDLL( "server.dll" ) )
 	{
@@ -508,7 +428,7 @@ GMOD_MODULE_OPEN( )
 	{
 		LuaError( "Couldn't open server.dll." );
 	}
-#elif LUAERROR_CLIENT
+#elif defined LUAERROR_CLIENT
 	CSimpleScan client_scan;
 	if( client_scan.SetDLL( "client.dll" ) )
 	{
@@ -526,12 +446,10 @@ GMOD_MODULE_OPEN( )
 #define garrysmod_bin_path "garrysmod/bin/" // This combined with lua_shared_file should ALWAYS work
 											// unless some numbnut likes to change folder names for fun
 #if __linux
-#define lua_shared_file "lua_shared_srv.so"
 #define server_file "server_srv.so"
 #define client_file "client_srv.so"
 #define FUNC_NAME_PREFIX ""
 #elif __APPLE__
-#define lua_shared_file "lua_shared.dylib"
 #define server_file "server.dylib"
 #define client_file "client.dylib"
 #define FUNC_NAME_PREFIX "_"
@@ -555,39 +473,9 @@ GMOD_MODULE_OPEN( )
 		m_ImageList = (struct dyld_all_image_infos *)list[0].n_value;
 	}
 #endif
-#define lua_getstack_name FUNC_NAME_PREFIX "lua_getstack"
-#define lua_getinfo_name FUNC_NAME_PREFIX "lua_getinfo"
 #define HandleClientLuaError_name FUNC_NAME_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc"
 #define Push_Entity_name FUNC_NAME_PREFIX "_Z11Push_EntityP11CBaseEntity"
 #define CLuaGameCallback__LuaError_name FUNC_NAME_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError"
-
-	void *lua_shared = dlopen( garrysmod_bin_path lua_shared_file, RTLD_NOW | RTLD_LOCAL );
-	if( lua_shared != 0 )
-	{
-		if( ( lua_getstack = (lua_getstack_t)dlsym( lua_shared, lua_getstack_name ) ) == 0 )
-		{
-			dlclose( lua_shared );
-			lua_shared = 0;
-			LuaError( "Unable to find function lua_getstack." );
-		}
-
-		if( ( lua_getinfo = (lua_getinfo_t)dlsym( lua_shared, lua_getinfo_name ) ) == 0 )
-		{
-			dlclose( lua_shared );
-			lua_shared = 0;
-			LuaError( "Unable to find function lua_getinfo." );
-		}
-	}
-	else
-	{
-		LuaError( "Couldn't open " lua_shared_file " file." );
-	}
-
-	if( lua_shared != 0 )
-	{
-		dlclose( lua_shared );
-		lua_shared = 0;
-	}
 
 #if LUAERROR_SERVER
 	void *server = dlopen( garrysmod_bin_path server_file, RTLD_NOW | RTLD_LOCAL );

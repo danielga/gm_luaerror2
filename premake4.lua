@@ -1,14 +1,12 @@
--- Change this variable to the path of your Garry's Mod module base include folder
---local GARRYSMOD_INCLUDES_PATH = "/home/daniel/Área de Trabalho/gmod-module-base/include" -- Linux
---local GARRYSMOD_INCLUDES_PATH = "D:/garrysmod stuff/gmod-module-base/include" -- Windows
-
 -- Change this variable to the path of your SourceSDK folder
 --local SOURCE_SDK_PATH = "/home/daniel/Área de Trabalho/SourceSDK" -- Linux
 --local SOURCE_SDK_PATH = "D:/garrysmod stuff/SourceSDK" -- Windows
 
-if not GARRYSMOD_INCLUDES_PATH or not SOURCE_SDK_PATH then
-	error("GARRYSMOD_INCLUDES_PATH or SOURCE_SDK_PATH not found!")
+if not SOURCE_SDK_PATH then
+	error("SOURCE_SDK_PATH not found!")
 end
+
+local GARRYSMOD_INCLUDES_PATH = "gmod-module-base/include"
 
 solution("gm_luaerror2")
 

@@ -6,4 +6,4 @@ If stuff starts erroring or fails to work, be sure to check the correct line end
 
 Be sure to set GARRYSMOD_INCLUDES_PATH and SOURCE_SDK_PATH to the Garry's Mod module base and the SourceSDK path, respectively!
 
-You will need some of the interfaces provided by my version of the headers repository for Garry's Mod here: https://bitbucket.org/tuestu1/gmod-module-base
+The required Garry's Mod headers to build modules are already included as externals. Thank me later. You might also find some useful stuff there.

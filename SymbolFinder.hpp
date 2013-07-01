@@ -2,7 +2,7 @@
 #define __SYMBOL_FINDER_HPP__
 
 #include <stddef.h>
-#if !_WIN32
+#ifndef _WIN32
 #include <vector>
 #endif
 

@@ -1,17 +1,17 @@
 #include "SymbolFinder.hpp"
 #include <stdint.h>
 #include <map>
-#if _WIN32
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#elif __linux
+#elif defined __linux
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
 #include <interface.h>
-#elif __APPLE__
+#elif defined __APPLE__
 #include <mach/task.h>
 #include <mach-o/dyld_images.h>
 #include <mach-o/loader.h>
@@ -25,7 +25,7 @@ struct DynLibInfo
 	size_t memorySize;
 };
 
-#if __linux || __APPLE__
+#if defined __linux || defined __APPLE__
 struct LibSymbolTable
 {
 	std::map<const char *, void *> table;
@@ -36,7 +36,7 @@ struct LibSymbolTable
 
 SymbolFinder::SymbolFinder( )
 {
-#if __APPLE__
+#ifdef __APPLE__
 	Gestalt( gestaltSystemVersionMajor, &m_OSXMajor );
 	Gestalt( gestaltSystemVersionMinor, &m_OSXMinor );
 
@@ -60,7 +60,7 @@ SymbolFinder::SymbolFinder( )
 
 SymbolFinder::~SymbolFinder( )
 {
-#if __linux || __APPLE__
+#if defined __linux || defined __APPLE__
 	for( size_t i = 0; i < symbolTables.size( ); ++i )
 	{
 		delete symbolTables[i];
@@ -107,9 +107,9 @@ void *SymbolFinder::FindPattern( const void *handle, const char *pattern, const 
 
 void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 {
-#if _WIN32
+#ifdef _WIN32
 	return (void *)GetProcAddress( (HMODULE)handle, symbol );
-#elif __linux
+#elif defined __linux
 	struct link_map *dlmap = (struct link_map *)handle;
 	LibSymbolTable *libtable = 0;
 	std::map<const char *, void *> *table = 0;
@@ -211,7 +211,7 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 
 	munmap( file_hdr, dlstat.st_size );
 	return symbol_pointer;
-#elif __APPLE__
+#elif defined __APPLE__
 	uintptr_t dlbase = 0;
 	uint32_t image_count = m_ImageList->infoArrayCount;
 	struct segment_command *linkedit_hdr = 0;
@@ -325,7 +325,7 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 
 void *SymbolFinder::FindSymbolFromBinary( const char *name, const char *symbol )
 {
-#if _WIN32
+#ifdef _WIN32
 	HMODULE binary = 0;
 	if( GetModuleHandleEx( 0, name, &binary ) == TRUE && binary != 0 )
 	{
@@ -333,7 +333,7 @@ void *SymbolFinder::FindSymbolFromBinary( const char *name, const char *symbol )
 		FreeModule( binary );
 		return symbol_pointer;
 	}
-#elif __linux || __APPLE__
+#elif defined __linux || defined __APPLE__
 	void *binary = dlopen( name, RTLD_NOW | RTLD_LOCAL );
 	if( binary != 0 )
 	{
@@ -357,7 +357,7 @@ void *SymbolFinder::Resolve( const void *handle, const char *data, const size_t 
 
 void *SymbolFinder::ResolveOnBinary( const char *name, const char *data, const size_t &len )
 {
-#if _WIN32
+#ifdef _WIN32
 	HMODULE binary = 0;
 	if( GetModuleHandleEx( 0, name, &binary ) == TRUE && binary != 0 )
 	{
@@ -365,7 +365,7 @@ void *SymbolFinder::ResolveOnBinary( const char *name, const char *data, const s
 		FreeModule( binary );
 		return symbol_pointer;
 	}
-#elif __linux || __APPLE__
+#elif defined __linux || defined __APPLE__
 	void *binary = dlopen( name, RTLD_NOW | RTLD_LOCAL );
 	if( binary != 0 )
 	{
@@ -384,7 +384,7 @@ bool SymbolFinder::GetLibraryInfo( const void *handle, DynLibInfo &lib )
 		return false;
 	}
 
-#if _WIN32
+#ifdef _WIN32
 	MEMORY_BASIC_INFORMATION info;
 	if( !VirtualQuery( handle, &info, sizeof( MEMORY_BASIC_INFORMATION ) ) )
 	{
@@ -414,7 +414,7 @@ bool SymbolFinder::GetLibraryInfo( const void *handle, DynLibInfo &lib )
 	}
 
 	lib.memorySize = opt->SizeOfImage;
-#elif __linux
+#elif defined __linux
 	Dl_info info;
 	if( !dladdr( handle, &info ) )
 	{
@@ -462,7 +462,7 @@ bool SymbolFinder::GetLibraryInfo( const void *handle, DynLibInfo &lib )
 			break;
 		}
 	}
-#elif __APPLE__
+#elif defined __APPLE__
 	Dl_info info;
 	if( !dladdr( handle, &info ) )
 	{

@@ -4,7 +4,7 @@
 #include "MologieDetours/detours.h"
 #include <vector>
 
-#if defined _WIN32
+#ifdef _WIN32
 #define VOFFSET 0
 #elif defined __linux || defined __APPLE__
 #define VOFFSET 1
@@ -21,14 +21,14 @@ struct CLuaError
 
 GarrysMod::Lua::ILuaInterface *lua = 0;
 
-#if LUAERROR_SERVER
-#if _WIN32
+#ifdef LUAERROR_SERVER
+#ifdef _WIN32
 #define Push_Entity_signature "\x55\x8b\xec\x83\xec\x14\x83\x3d\x2A\x2A\x2A\x2A\x2A\x74\x2A\x8b\x4d\x08"
 #endif
 typedef void ( *Push_Entity_t ) ( CBaseEntity *entity );
 Push_Entity_t Push_Entity;
 
-#if _WIN32
+#ifdef _WIN32
 #define HandleClientLuaError_signature "\x55\x8b\xec\x83\xec\x08\x8b\x0d\x2A\x2A\x2A\x2A\x8b\x11\x53\x56"
 #endif
 typedef void ( __cdecl *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
@@ -74,7 +74,7 @@ void __cdecl HandleClientLuaError_d( CBasePlayer *player, const char *error )
 }
 #endif
 
-#if _WIN32
+#ifdef _WIN32
 #define CLuaGameCallback__LuaError_signature "\x55\x8b\xec\x81\xec\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xdb\x53\x89"
 typedef void ( __thiscall *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
 #else
@@ -82,7 +82,7 @@ typedef void ( __cdecl *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callba
 #endif
 MologieDetours::Detour<CLuaGameCallback__LuaError_t> *CLuaGameCallback__LuaError_detour = 0;
 CLuaGameCallback__LuaError_t CLuaGameCallback__LuaError;
-#if _WIN32
+#ifdef _WIN32
 void __fastcall CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, void *fuckthis, CLuaError *error )
 #else
 void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError *error )
@@ -203,7 +203,7 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 
 
 
-#if _WIN32
+#ifdef _WIN32
 #define snprintf _snprintf
 #endif
 
@@ -222,8 +222,8 @@ GMOD_MODULE_OPEN( )
 
 	SymbolFinder symfinder;
 
-#if defined _WIN32
-#if defined LUAERROR_SERVER
+#ifdef _WIN32
+#ifdef LUAERROR_SERVER
 	HMODULE server = LoadLibrary( "server.dll" );
 	if( server != 0 )
 	{
@@ -286,11 +286,11 @@ GMOD_MODULE_OPEN( )
 #endif
 #else
 #define garrysmod_bin_path "garrysmod/bin/"
-#if __linux
+#ifdef __linux
 #define server_file "server_srv.so"
 #define client_file "client_srv.so"
 #define FUNC_NAME_PREFIX ""
-#elif __APPLE__
+#elif defined __APPLE__
 #define server_file "server.dylib"
 #define client_file "client.dylib"
 #define FUNC_NAME_PREFIX "_"
@@ -299,7 +299,7 @@ GMOD_MODULE_OPEN( )
 #define Push_Entity_name FUNC_NAME_PREFIX "_Z11Push_EntityP11CBaseEntity"
 #define CLuaGameCallback__LuaError_name FUNC_NAME_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError"
 
-#if LUAERROR_SERVER
+#ifdef LUAERROR_SERVER
 	void *server = dlopen( garrysmod_bin_path server_file, RTLD_NOW | RTLD_LOCAL );
 	if( server != 0 )
 	{
@@ -337,7 +337,7 @@ GMOD_MODULE_OPEN( )
 		dlclose( server );
 		server = 0;
 	}
-#elif LUAERROR_CLIENT
+#elif defined LUAERROR_CLIENT
 	void *client = dlopen( garrysmod_bin_path client_file, RTLD_NOW | RTLD_LOCAL );
 	if( client != 0 )
 	{
@@ -362,7 +362,7 @@ GMOD_MODULE_OPEN( )
 #endif
 #endif
 
-#if LUAERROR_SERVER
+#ifdef LUAERROR_SERVER
 	if( HandleClientLuaError != 0 )
 	{
 		HandleClientLuaError_detour = new MologieDetours::Detour<HandleClientLuaError_t>( HandleClientLuaError, HandleClientLuaError_d );
@@ -380,7 +380,7 @@ GMOD_MODULE_OPEN( )
 
 GMOD_MODULE_CLOSE( )
 {
-#if LUAERROR_SERVER
+#ifdef LUAERROR_SERVER
 	if( HandleClientLuaError_detour != 0 )
 	{
 		delete HandleClientLuaError_detour;

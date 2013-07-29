@@ -10,13 +10,18 @@
 #include <dlfcn.h>
 #include <elf.h>
 #include <link.h>
-#include <interface.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#define PAGE_SIZE 4096
+#define PAGE_ALIGN_UP( x ) ( ( x + PAGE_SIZE - 1 ) & ~( PAGE_SIZE - 1 ) )
 #elif defined __APPLE__
 #include <mach/task.h>
 #include <mach-o/dyld_images.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
-#include <interface.h>
+#include <string.h>
+#include <sys/mman.h>
 #endif
 
 struct DynLibInfo
@@ -112,26 +117,27 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 #elif defined __linux
 	struct link_map *dlmap = (struct link_map *)handle;
 	LibSymbolTable *libtable = 0;
-	std::map<const char *, void *> *table = 0;
+	std::map<const char *, void *> *ptable = 0;
 	for( size_t i = 0; i < symbolTables.size( ); ++i )
 	{
 		libtable = symbolTables[i];
 		if( libtable->lib_base == dlmap->l_addr )
 		{
-			table = &libtable->table;
+			ptable = &libtable->table;
 			break;
 		}
 	}
 
-	if( table == 0 )
+	if( ptable == 0 )
 	{
 		libtable = new LibSymbolTable( );
 		libtable->lib_base = dlmap->l_addr;
 		libtable->last_pos = 0;
-		table = &libtable->table;
+		ptable = &libtable->table;
 		symbolTables.push_back( libtable );
 	}
 
+    std::map<const char *, void *> &table = *ptable;
 	void *symbol_entry = table[symbol];
 	if( symbol_entry != 0 )
 	{
@@ -337,7 +343,7 @@ void *SymbolFinder::FindSymbolFromBinary( const char *name, const char *symbol )
 	void *binary = dlopen( name, RTLD_NOW | RTLD_LOCAL );
 	if( binary != 0 )
 	{
-		void *symbol_pointer = ResolveSymbol( binary, symbol );
+		void *symbol_pointer = FindSymbol( binary, symbol );
 		dlclose( binary );
 		return symbol_pointer;
 	}

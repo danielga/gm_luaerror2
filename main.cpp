@@ -7,7 +7,10 @@
 #ifdef _WIN32
 #define VOFFSET 0
 #elif defined __linux || defined __APPLE__
+#include <stdio.h>
+#include <dlfcn.h>
 #define VOFFSET 1
+#define __cdecl __attribute__((__cdecl__))
 #endif
 
 class CBaseEntity;
@@ -115,7 +118,11 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 			if( lua->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
 			{
 				lua->PushString( "LuaError" );
-				lua->PushBool( lua->IsServer( ) );
+#ifdef LUAERROR_SERVER
+				lua->PushBool( true );
+#else
+                lua->PushBool( false );
+#endif
 				lua->PushString( strerr );
 
 				if( stacksize > 0 )
@@ -171,7 +178,7 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 					{
 						lua->Msg( "[LuaError hook error] %s\n", lua->GetString( ) );
 						lua->Pop( 3 );
-						return ( CLuaGameCallback__LuaError_detour->GetOriginalFunction( ) )( callback, error );
+						return CLuaGameCallback__LuaError_detour->GetOriginalFunction( )( callback, error );
 					}
 				}
 				else
@@ -180,7 +187,7 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 					{
 						lua->Msg( "[LuaError hook error] %s\n", lua->GetString( ) );
 						lua->Pop( 3 );
-						return ( CLuaGameCallback__LuaError_detour->GetOriginalFunction( ) )( callback, error );
+						return CLuaGameCallback__LuaError_detour->GetOriginalFunction( )( callback, error );
 					}
 				}
 
@@ -198,10 +205,8 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 	}
 
 	lua->Pop( 1 );
-	return ( CLuaGameCallback__LuaError_detour->GetOriginalFunction( ) )( callback, error );
+	return CLuaGameCallback__LuaError_detour->GetOriginalFunction( )( callback, error );
 }
-
-
 
 #ifdef _WIN32
 #define snprintf _snprintf

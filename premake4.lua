@@ -4,23 +4,31 @@ solution("gm_luaerror2")
 
 	language("C++")
 	location("Projects/" .. os.get() .. "-" .. _ACTION)
-	flags({"NoPCH", "StaticRuntime", "EnableSSE"})
+	flags({"NoPCH"})
 
-	local lib_folder = "public"
 	if os.is("macosx") then
-		lib_folder = "mac"
 		platforms({"Universal32"})
 	else
-		if os.is("linux") then
-			lib_folder = "linux"
-		end
 		platforms({"x32"})
 	end
+
+	configuration("windows")
+		libdirs({SDK_PATH .. "/lib/public"})
+		linkoptions({"/NODEFAULTLIB:libc", "/NODEFAULTLIB:libcd", "/NODEFAULTLIB:libcmt"})
+
+	configuration("macosx")
+		libdirs({SDK_PATH .. "/lib/public/osx32"})
+		linkoptions({"-nostdlib"})
+
+	configuration("linux")
+		libdirs({SDK_PATH .. "/lib/public/linux32"})
+		-- remove standard libraries from build
+
 	configurations({"Release"})
 
 	configuration("Release")
 		defines({"NDEBUG"})
-		flags({"Optimize"})
+		flags({"Optimize", "EnableSSE"})
 		targetdir("Projects/Release")
 		objdir("Projects/Intermediate")
 
@@ -28,36 +36,44 @@ solution("gm_luaerror2")
 		kind("SharedLib")
 		defines({"LUAERROR_SERVER", "GMMODULE"})
 		includedirs({GARRYSMOD_INCLUDES_PATH})
-		links(lib_files)
 		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
 		vpaths({["Header files"] = {"**.h", "**.hxx", "**.hpp"}, ["Source files"] = {"**.c", "**.cxx", "**.cpp"}})
+		
 		targetprefix("gmsv_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")
-		if os.is("windows") then
+
+		links({"tier0", "tier1", "tier2"})
+
+		configuration("windows")
 			targetsuffix("_win32")
-		elseif os.is("linux") then
+
+		configuration("linux")
 			targetsuffix("_linux")
 			targetextension(".dll") -- Derp Garry, WHY
-		elseif os.is("macosx") then
+
+		configuration("macosx")
 			targetsuffix("_mac")
 			targetextension(".dll") -- Derp Garry, WHY
-		end
 
 	project("gmcl_luaerror2")
 		kind("SharedLib")
 		defines({"LUAERROR_CLIENT", "GMMODULE"})
 		includedirs({GARRYSMOD_INCLUDES_PATH})
-		links(lib_files)
 		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
 		vpaths({["Header files"] = {"**.h", "**.hxx", "**.hpp"}, ["Source files"] = {"**.c", "**.cxx", "**.cpp"}})
+
 		targetprefix("gmcl_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")
-		if os.is("windows") then
+
+		links({"tier0", "tier1", "tier2"})
+
+		configuration("windows")
 			targetsuffix("_win32")
-		elseif os.is("linux") then
+
+		configuration("linux")
 			targetsuffix("_linux")
 			targetextension(".dll") -- Derp Garry, WHY
-		elseif os.is("macosx") then
+
+		configuration("macosx")
 			targetsuffix("_mac")
 			targetextension(".dll") -- Derp Garry, WHY
-		end

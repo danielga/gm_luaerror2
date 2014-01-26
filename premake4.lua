@@ -1,4 +1,5 @@
 local GARRYSMOD_INCLUDES_PATH = "gmod-module-base/include"
+local SDK_PATH = "E:/Programming/source-sdk-2013/mp/src"
 
 solution("gm_luaerror2")
 
@@ -31,6 +32,7 @@ solution("gm_luaerror2")
 		flags({"Optimize", "EnableSSE"})
 		targetdir("Projects/Release")
 		objdir("Projects/Intermediate")
+		links({"tier0", "tier1", "tier2"})
 
 	project("gmsv_luaerror2")
 		kind("SharedLib")
@@ -41,8 +43,6 @@ solution("gm_luaerror2")
 		
 		targetprefix("gmsv_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")
-
-		links({"tier0", "tier1", "tier2"})
 
 		configuration("windows")
 			targetsuffix("_win32")
@@ -64,8 +64,6 @@ solution("gm_luaerror2")
 
 		targetprefix("gmcl_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")
-
-		links({"tier0", "tier1", "tier2"})
 
 		configuration("windows")
 			targetsuffix("_win32")

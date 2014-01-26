@@ -121,7 +121,7 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 #ifdef LUAERROR_SERVER
 				lua->PushBool( true );
 #else
-                lua->PushBool( false );
+				lua->PushBool( false );
 #endif
 				lua->PushString( strerr );
 

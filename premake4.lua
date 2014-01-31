@@ -29,8 +29,8 @@ solution("gm_luaerror2")
 
 	project("gmsv_luaerror2")
 		kind("SharedLib")
-		defines({"LUAERROR_SERVER", "GAME_DLL", "GMMODULE"})
-		includedirs({"Source", GARRYSMOD_INCLUDES_PATH, SDK_PATH .. "/public"})
+		defines({"LUAERROR_SERVER", "GMMODULE"})
+		includedirs({"Source", GARRYSMOD_INCLUDES_PATH})
 		files({"Source/*.cpp", "Source/*.hpp", "Source/MologieDetours/hde.cpp", "Source/MologieDetours/detours.h"})
 		vpaths({["Header files/*"] = {"Source/**.hpp", "Source/**.h"}, ["Source files/*"] = {"Source/**.cpp", "Source/MologieDetours/**.cpp"}})
 		
@@ -50,8 +50,8 @@ solution("gm_luaerror2")
 
 	project("gmcl_luaerror2")
 		kind("SharedLib")
-		defines({"LUAERROR_CLIENT", "CLIENT_DLL", "GMMODULE"})
-		includedirs({"Source", GARRYSMOD_INCLUDES_PATH, SDK_PATH .. "/public"})
+		defines({"LUAERROR_CLIENT", "GMMODULE"})
+		includedirs({"Source", GARRYSMOD_INCLUDES_PATH})
 		files({"Source/*.cpp", "Source/*.hpp", "Source/MologieDetours/hde.cpp", "Source/MologieDetours/detours.h"})
 		vpaths({["Header files/*"] = {"Source/**.hpp", "Source/**.h"}, ["Source files/*"] = {"Source/**.cpp"}})
 

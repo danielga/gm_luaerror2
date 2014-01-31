@@ -121,6 +121,7 @@ static struct LuaErrorChain
 {
 	LuaErrorChain( ) :
 		inside_chain( false ),
+		runtime( false ),
 		source_line( -1 )
 	{ }
 
@@ -137,6 +138,7 @@ static struct LuaErrorChain
 	void Exit( )
 	{
 		inside_chain = false;
+		runtime = false;
 		source_file.clear( );
 		source_line = -1;
 		error_string.clear( );
@@ -144,6 +146,7 @@ static struct LuaErrorChain
 	}
 
 	bool inside_chain;
+	bool runtime;
 	std::string source_file;
 	int source_line;
 	std::string error_string;
@@ -168,11 +171,7 @@ void __cdecl CLuaGameCallback__LuaError_d( CLuaGameCallback *callback, CLuaError
 			{
 				lua->PushString( "LuaError" );
 
-#if defined LUAERROR_SERVER
-				lua->PushBool( true );
-#elif defined LUAERROR_CLIENT
-				lua->PushBool( false );
-#endif
+				lua->PushBool( lua_error_chain.runtime );
 
 				lua->PushString( lua_error_chain.source_file.c_str( ) );
 				lua->PushNumber( lua_error_chain.source_line );
@@ -291,6 +290,8 @@ void __cdecl lj_err_lex_d( lua_State *state, void *src, const char *tok, int32_t
 
 	lua_error_chain.Enter( );
 
+	lua_error_chain.runtime = false;
+
 	const char *srcstr = (const char *)( (uintptr_t)src + 16 );
 	if( *srcstr == '@' )
 		++srcstr;
@@ -319,13 +320,6 @@ void __cdecl lj_err_lex_d( lua_State *state, void *src, const char *tok, int32_t
 		lua_error_chain.stack_data.push_back( dbg );
 	}
 
-	if( lua_error_chain.stack_data.empty( ) )
-	{
-		dbg = { 0, NULL, "", "main", srcstr - 1, line, 0, 0, 0, "", 0 };
-		strncpy( dbg.short_src, srcstr, sizeof( dbg.short_src ) );
-		lua_error_chain.stack_data.push_back( dbg );
-	}
-
 	return lj_err_lex_detour->GetOriginalFunction( )( state, src, tok, line, em, argp );
 }
 
@@ -336,7 +330,9 @@ void __cdecl lj_err_run_d( lua_State *state )
 
 	lua_error_chain.Enter( );
 
-	lua_error_chain.error_string = LUA->GetString( 2 );
+	lua_error_chain.runtime = true;
+
+	lua_error_chain.error_string = LUA->GetString( LUA->Top( ) - 1 );
 
 	GarrysMod::Lua::ILuaInterface *lua_interface = static_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
 	lua_Debug dbg = { 0 };
@@ -346,17 +342,10 @@ void __cdecl lj_err_run_d( lua_State *state )
 		lua_error_chain.stack_data.push_back( dbg );
 	}
 
-	if( !lua_error_chain.stack_data.empty( ) )
-	{
-		lua_Debug &stackroot = lua_error_chain.stack_data[0];
-		lua_error_chain.source_file = stackroot.short_src;
-		lua_error_chain.source_line = stackroot.currentline;
-	}
-	else
-	{
-		lua_error_chain.source_file = "unknown";
-		lua_error_chain.source_line = 0;
-	}
+	lua_error_chain.source_file = LUA->GetString( LUA->Top( ) );
+	size_t pos = lua_error_chain.source_file.find( ':' );
+	lua_error_chain.source_line = atoi( &lua_error_chain.source_file[pos + 1] );
+	lua_error_chain.source_file.resize( pos );
 
 	return lj_err_run_detour->GetOriginalFunction( )( state );
 }

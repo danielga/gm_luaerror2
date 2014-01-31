@@ -2,6 +2,9 @@
 #include <GarrysMod/Lua/LuaInterface.h>
 #include <SymbolFinder.hpp>
 #include <MologieDetours/detours.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstdarg>
 #include <string>
 #include <vector>
 
@@ -292,7 +295,7 @@ void __cdecl lj_err_lex_d( lua_State *state, void *src, const char *tok, int32_t
 
 	lua_error_chain.runtime = false;
 
-	const char *srcstr = (const char *)( (uintptr_t)src + 16 );
+	const char *srcstr = reinterpret_cast<const char *>( reinterpret_cast<uintptr_t>( src ) + 16 );
 	if( *srcstr == '@' )
 		++srcstr;
 
@@ -454,10 +457,10 @@ GMOD_MODULE_OPEN( )
 #if defined __linux
 
 #if defined LUAERROR_SERVER
-#define BINARY_FILE "server_srv.so"
+#define MAIN_BINARY_FILE "server_srv.so"
 #define LUA_SHARED_BINARY "lua_shared_srv.so"
 #elif defined LUAERROR_CLIENT
-#define BINARY_FILE "client_srv.so"
+#define MAIN_BINARY_FILE "client_srv.so"
 #define LUA_SHARED_BINARY "lua_shared.so"
 #endif
 
@@ -482,7 +485,7 @@ GMOD_MODULE_OPEN( )
 	{
 #if defined LUAERROR_SERVER
 
-		HandleClientLuaError = static_cast<HandleClientLuaError_t>( symfinder.FindSymbol( binary, FUNC_NAME_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc" ) );
+		HandleClientLuaError = reinterpret_cast<HandleClientLuaError_t>( symfinder.FindSymbol( binary, FUNC_NAME_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc" ) );
 		if( HandleClientLuaError == NULL )
 		{
 			dlclose( binary );
@@ -490,7 +493,7 @@ GMOD_MODULE_OPEN( )
 			LuaError( "Unable to detour function HandleClientLuaError (" MAIN_BINARY_FILE ")." );
 		}
 
-		Push_Entity = static_cast<Push_Entity_t>( symfinder.FindSymbol( binary, FUNC_NAME_PREFIX "_Z11Push_EntityP11CBaseEntity" ) );
+		Push_Entity = reinterpret_cast<Push_Entity_t>( symfinder.FindSymbol( binary, FUNC_NAME_PREFIX "_Z11Push_EntityP11CBaseEntity" ) );
 		if( Push_Entity == NULL )
 		{
 			dlclose( binary );
@@ -500,7 +503,7 @@ GMOD_MODULE_OPEN( )
 
 #endif
 
-		CLuaGameCallback__LuaError = static_cast<CLuaGameCallback__LuaError_t>( symfinder.FindSymbol( binary, FUNC_NAME_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError" ) );
+		CLuaGameCallback__LuaError = reinterpret_cast<CLuaGameCallback__LuaError_t>( symfinder.FindSymbol( binary, FUNC_NAME_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError" ) );
 		if( CLuaGameCallback__LuaError == NULL )
 		{
 			dlclose( binary );
@@ -522,7 +525,7 @@ GMOD_MODULE_OPEN( )
 	void *lua_shared = dlopen( GARRYSMOD_BIN_PATH LUA_SHARED_BINARY, RTLD_NOW | RTLD_LOCAL );
 	if( lua_shared != NULL )
 	{
-		lj_err_lex = static_cast<lj_err_lex_t>( symfinder.FindSymbol( lua_shared, FUNC_NAME_PREFIX "lj_err_lex" ) );
+		lj_err_lex = reinterpret_cast<lj_err_lex_t>( symfinder.FindSymbol( lua_shared, FUNC_NAME_PREFIX "lj_err_lex" ) );
 		if( lj_err_lex == NULL )
 		{
 			dlclose( lua_shared );
@@ -530,7 +533,7 @@ GMOD_MODULE_OPEN( )
 			LuaError( "Unable to sigscan function lj_err_lex (" LUA_SHARED_BINARY ")." );
 		}
 
-		lj_err_run = static_cast<lj_err_run_t>( symfinder.FindSymbol( lua_shared, FUNC_NAME_PREFIX "lj_err_run" ) );
+		lj_err_run = reinterpret_cast<lj_err_run_t>( symfinder.FindSymbol( lua_shared, FUNC_NAME_PREFIX "lj_err_run" ) );
 		if( lj_err_run == NULL )
 		{
 			dlclose( lua_shared );

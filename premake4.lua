@@ -1,5 +1,3 @@
-local SDK_PATH = "E:/Programming/source-sdk-2013/mp/src"
-
 local GARRYSMOD_INCLUDES_PATH = "gmod-module-base/include"
 local project_folder = "Projects/" .. os.get() .. "/" .. _ACTION
 
@@ -15,18 +13,6 @@ solution("gm_luaerror2")
 		platforms({"x32"})
 	end
 
-	configuration("windows")
-		libdirs({SDK_PATH .. "/lib/public"})
-		linkoptions({"/NODEFAULTLIB:libc.lib", "/NODEFAULTLIB:libcd.lib", "/NODEFAULTLIB:libcmt.lib", "/NODEFAULTLIB:libcmtd.lib"})
-
-	configuration("macosx")
-		libdirs({SDK_PATH .. "/lib/public/osx32"})
-		linkoptions({"-Wl,-nodefaultlibs"})
-
-	configuration("linux")
-		libdirs({SDK_PATH .. "/lib/public/linux32"})
-		linkoptions({"-Wl,-nodefaultlibs"})
-
 	configurations({"Debug", "Release"})
 
 	configuration("Debug")
@@ -34,14 +20,12 @@ solution("gm_luaerror2")
 		flags({"Symbols"})
 		targetdir(project_folder .. "/Debug")
 		objdir(project_folder .. "/Intermediate")
-		links({"tier0", "tier1", "tier2"})
 
 	configuration("Release")
 		defines({"NDEBUG"})
 		flags({"Optimize", "EnableSSE"})
 		targetdir(project_folder .. "/Release")
 		objdir(project_folder .. "/Intermediate")
-		links({"tier0", "tier1", "tier2"})
 
 	project("gmsv_luaerror2")
 		kind("SharedLib")

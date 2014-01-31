@@ -137,7 +137,7 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 		symbolTables.push_back( libtable );
 	}
 
-    std::map<const char *, void *> &table = *ptable;
+	std::map<const char *, void *> &table = *ptable;
 	void *symbol_entry = table[symbol];
 	if( symbol_entry != 0 )
 	{

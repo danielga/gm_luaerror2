@@ -1,11 +1,13 @@
-local GARRYSMOD_INCLUDES_PATH = "gmod-module-base/include"
 local SDK_PATH = "E:/Programming/source-sdk-2013/mp/src"
+
+local GARRYSMOD_INCLUDES_PATH = "gmod-module-base/include"
+local project_folder = "Projects/" .. os.get() .. "/" .. _ACTION
 
 solution("gm_luaerror2")
 
 	language("C++")
-	location("Projects/" .. os.get() .. "-" .. _ACTION)
-	flags({"NoPCH"})
+	location(project_folder)
+	flags({"NoPCH", "ExtraWarnings"})
 
 	if os.is("macosx") then
 		platforms({"Universal32"})
@@ -15,31 +17,38 @@ solution("gm_luaerror2")
 
 	configuration("windows")
 		libdirs({SDK_PATH .. "/lib/public"})
-		linkoptions({"/NODEFAULTLIB:libc", "/NODEFAULTLIB:libcd", "/NODEFAULTLIB:libcmt"})
+		linkoptions({"/NODEFAULTLIB:libc.lib", "/NODEFAULTLIB:libcd.lib", "/NODEFAULTLIB:libcmt.lib", "/NODEFAULTLIB:libcmtd.lib"})
 
 	configuration("macosx")
 		libdirs({SDK_PATH .. "/lib/public/osx32"})
-		linkoptions({"-nostdlib"})
+		linkoptions({"-Wl,-nodefaultlibs"})
 
 	configuration("linux")
 		libdirs({SDK_PATH .. "/lib/public/linux32"})
-		-- remove standard libraries from build
+		linkoptions({"-Wl,-nodefaultlibs"})
 
-	configurations({"Release"})
+	configurations({"Debug", "Release"})
+
+	configuration("Debug")
+		defines({"DEBUG"})
+		flags({"Symbols"})
+		targetdir(project_folder .. "/Debug")
+		objdir(project_folder .. "/Intermediate")
+		links({"tier0", "tier1", "tier2"})
 
 	configuration("Release")
 		defines({"NDEBUG"})
 		flags({"Optimize", "EnableSSE"})
-		targetdir("Projects/Release")
-		objdir("Projects/Intermediate")
+		targetdir(project_folder .. "/Release")
+		objdir(project_folder .. "/Intermediate")
 		links({"tier0", "tier1", "tier2"})
 
 	project("gmsv_luaerror2")
 		kind("SharedLib")
 		defines({"LUAERROR_SERVER", "GAME_DLL", "GMMODULE"})
-		includedirs({GARRYSMOD_INCLUDES_PATH})
-		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
-		vpaths({["Header files"] = {"**.h", "**.hxx", "**.hpp"}, ["Source files"] = {"**.c", "**.cxx", "**.cpp"}})
+		includedirs({"Source", GARRYSMOD_INCLUDES_PATH, SDK_PATH .. "/public"})
+		files({"Source/*.cpp", "Source/*.hpp", "Source/MologieDetours/hde.cpp", "Source/MologieDetours/detours.h"})
+		vpaths({["Header files/*"] = {"Source/**.hpp", "Source/**.h"}, ["Source files/*"] = {"Source/**.cpp", "Source/MologieDetours/**.cpp"}})
 		
 		targetprefix("gmsv_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")
@@ -58,9 +67,9 @@ solution("gm_luaerror2")
 	project("gmcl_luaerror2")
 		kind("SharedLib")
 		defines({"LUAERROR_CLIENT", "CLIENT_DLL", "GMMODULE"})
-		includedirs({GARRYSMOD_INCLUDES_PATH})
-		files({"*.c", "*.cxx", "*.cpp", "*.h", "*.hxx", "*.hpp", "MologieDetours/hde.cpp", "MologieDetours/detours.h", "MologieDetours/hde.h"})
-		vpaths({["Header files"] = {"**.h", "**.hxx", "**.hpp"}, ["Source files"] = {"**.c", "**.cxx", "**.cpp"}})
+		includedirs({"Source", GARRYSMOD_INCLUDES_PATH, SDK_PATH .. "/public"})
+		files({"Source/*.cpp", "Source/*.hpp", "Source/MologieDetours/hde.cpp", "Source/MologieDetours/detours.h"})
+		vpaths({["Header files/*"] = {"Source/**.hpp", "Source/**.h"}, ["Source files/*"] = {"Source/**.cpp"}})
 
 		targetprefix("gmcl_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")

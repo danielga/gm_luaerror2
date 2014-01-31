@@ -38,7 +38,6 @@
 
 #include <stdint.h>
 #include "hde.h"
-#include <stdexcept>
 #include <cstring>
 
 #ifdef _WIN32
@@ -100,12 +99,15 @@ namespace MologieDetours
 	 * @author	Oliver Kuckertz
 	 * @date	14.05.2011
 	 */
-	class DetourException : public std::runtime_error
+	class DetourException
 	{
 	public:
-		typedef std::runtime_error _Mybase;
-		explicit DetourException(const std::string& _Message) : _Mybase(_Message.c_str()) { }
-		explicit DetourException(const char* _Message) : _Mybase(_Message) { }
+		explicit DetourException(const std::string& _Message) { strncpy(_error, _Message.c_str(), sizeof(_error)-1); }
+		explicit DetourException(const char* _Message) { strncpy(_error, _Message, sizeof(_error)-1); }
+		const char *what() const { return _error; }
+
+	private:
+		char _error[1024];
 	};
 
 	/**

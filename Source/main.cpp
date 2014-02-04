@@ -460,7 +460,7 @@ GMOD_MODULE_OPEN( )
 #define MAIN_BINARY_FILE "server_srv.so"
 #define LUA_SHARED_BINARY "lua_shared_srv.so"
 #elif defined LUAERROR_CLIENT
-#define MAIN_BINARY_FILE "client_srv.so"
+#define MAIN_BINARY_FILE "client.so"
 #define LUA_SHARED_BINARY "lua_shared.so"
 #endif
 

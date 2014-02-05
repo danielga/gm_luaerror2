@@ -5,11 +5,12 @@
 *
 */
 
-//#include <boost/cstdint.hpp>
 #include <stdint.h>
 #include <string.h>
 #include "../include/hde64.h"
 #include "../include/table64.h"
+
+#pragma warning(disable:4701 4706)
 
 unsigned int hde64_disasm(const void *code, hde64s *hs)
 {

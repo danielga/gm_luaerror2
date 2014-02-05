@@ -10,7 +10,6 @@
 #ifndef _HDE32_H_
 #define _HDE32_H_
 
-//#include <boost/cstdint.hpp>
 #include <stdint.h>
 
 #define F_MODRM         0x00000001

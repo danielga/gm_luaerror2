@@ -1,6 +1,3 @@
-#ifndef HEADER_965F7F32451F3281
-#define HEADER_965F7F32451F3281
-
 /**
  * Mologie Detours
  * Copyright (c) 2011 Oliver Kuckertz <oliver.kuckertz@mologie.de>
@@ -32,12 +29,16 @@
  * @todo	Expand relative opcodes which can not be relocated
  * @todo	Other detour types, maybe use/write a mutation engine
  */
+#ifdef _MSVC_VER
+#pragma warning(disable:4244)
+#endif
 
 #ifndef INCLUDED_LIB_MOLOGIE_DETOURS_DETOURS_H
 #define INCLUDED_LIB_MOLOGIE_DETOURS_DETOURS_H
 
 #include <stdint.h>
 #include "hde.h"
+#include <stdexcept>
 #include <cstring>
 
 #ifdef _WIN32
@@ -99,15 +100,12 @@ namespace MologieDetours
 	 * @author	Oliver Kuckertz
 	 * @date	14.05.2011
 	 */
-	class DetourException
+	class DetourException : public std::runtime_error
 	{
 	public:
-		explicit DetourException(const std::string& _Message) { strncpy(_error, _Message.c_str(), sizeof(_error)-1); }
-		explicit DetourException(const char* _Message) { strncpy(_error, _Message, sizeof(_error)-1); }
-		const char *what() const { return _error; }
-
-	private:
-		char _error[1024];
+		typedef std::runtime_error _Mybase;
+		explicit DetourException(const std::string& _Message) : _Mybase(_Message.c_str()) { }
+		explicit DetourException(const char* _Message) : _Mybase(_Message) { }
 	};
 
 	/**
@@ -210,6 +208,23 @@ namespace MologieDetours
 		}
 #ifdef _WIN32
 		/**
+		 * @fn	Detour::Detour(const char* moduleName, const char* lpProcName, function_type pDetour)
+		 *
+		 * @brief	Creates a new local detour on an exported function.
+		 *
+		 * @author	Kai Uwe Jesussek
+		 * @date	06.11.2011
+		 *
+		 * @param	moduleName  The Name of the module.
+		 * @param	lpProcName	Name of the pointer to a proc.
+		 * @param	pDetour   	The detour.
+		 */
+		Detour(const char* moduleName, const char* lpProcName, function_type pDetour)
+			: pSource_(reinterpret_cast<function_type>(GetProcAddress(GetModuleHandle(moduleName), lpProcName))), pDetour_(pDetour), instructionCount_(0)
+		{
+			CreateDetour();
+		}
+		/**
 		 * @fn	Detour::Detour(HMODULE module, const char* lpProcName, function_type pDetour)
 		 *
 		 * @brief	Creates a new local detour on an exported function.
@@ -241,14 +256,14 @@ namespace MologieDetours
 		 * @exception	DetourPageProtectionException	Thrown when the page protection of detour-related
 		 * 												memory can not be changed.
 		 */
-		~Detour()
+		virtual ~Detour()
 		{
 			try
 			{
 				// Attempt to revert
 				Revert();
 			}
-			catch(DetourException)
+			catch(DetourException &)
 			{
 				// Reverting failed, redirect trampoline to original code instead
 				*reinterpret_cast<address_pointer_type>(trampoline_ + 1) = backupOriginalCode_ - trampoline_ - MOLOGIE_DETOURS_DETOUR_SIZE;
@@ -422,12 +437,12 @@ namespace MologieDetours
 			// Reprotect original function
 			if(!MOLOGIE_DETOURS_MEMORY_REPROTECT(targetFunction, MOLOGIE_DETOURS_DETOUR_SIZE, dwProt))
 			{
-				throw DetourPageProtectionException("Failed to change page protection of original function", reinterpret_cast<void*>(targetFunction));
+			    throw DetourPageProtectionException("Failed to change page protection of original function", reinterpret_cast<void*>(targetFunction));
 			}
 
 			// Flush instruction cache on Windows
 #ifdef _WIN32
-			FlushInstructionCache(GetCurrentProcess(), pSource_, MOLOGIE_DETOURS_DETOUR_SIZE);
+			FlushInstructionCache(GetCurrentProcess(), (const void*) pSource_, MOLOGIE_DETOURS_DETOUR_SIZE);
 #endif
 		}
 
@@ -469,7 +484,7 @@ namespace MologieDetours
 			// Reprotect original function
 			if(!MOLOGIE_DETOURS_MEMORY_REPROTECT(pSource_, MOLOGIE_DETOURS_DETOUR_SIZE, dwProt))
 			{
-				throw DetourPageProtectionException("Failed to change page protection of original function", trampoline_);
+			    throw DetourPageProtectionException("Failed to change page protection of original function", trampoline_);
 			}
 
 			// Free memory allocated for trampoline and original code
@@ -478,7 +493,7 @@ namespace MologieDetours
 		}
 
 		/**
-		 * @fn	void Detour::RelocateCode(boost::uint8_t* baseOld, boost::uint8_t* baseNew, size_t size)
+		 * @fn	void Detour::RelocateCode(uint8_t* baseOld, uint8_t* baseNew, size_t size)
 		 *
 		 * @brief	This function relocates the copied code of another function. Only works with code
 		 * 			that HDE (or the custom disassembler backend) can actually parse.
@@ -515,9 +530,9 @@ namespace MologieDetours
 				if(hs.flags & F_RELATIVE)
 				{
 #if defined(MOLOGIE_DETOURS_HDE_32)
-					if(hs.flags & F_IMM8 || hs.flags & F_IMM16)
+					if((hs.flags & F_IMM8) || (hs.flags & F_IMM16))
 #elif defined(MOLOGIE_DETOURS_HDE64)
-					if(hs.flags & F_IMM8 || hs.flags & F_IMM16 || hs.flags & F_IMM32)
+					if((hs.flags & F_IMM8) || (hs.flags & F_IMM16) || (hs.flags & F_IMM32))
 #endif
 					{
 						// Oh noes! We shouldn't continue here.
@@ -684,7 +699,7 @@ namespace MologieDetours
 		function_type pSourceBackup_;
 		function_type pDetour_;
 #ifndef _WIN32
-		long int pageSize_;
+        long int pageSize_;
 #endif
 	};
 
@@ -738,12 +753,12 @@ namespace MologieDetours
 		 */
 		bool IsHotpatchable()
 		{
-			constboost::uint8_t movEdiEdi[] = { 0x8B, 0xFF };
+			const uint8_t movEdiEdi[] = { 0x8B, 0xFF };
 
 			bool haveNops = true;
-			bool haveSpace = (memcmp(reinterpret_cast<void*>(pSource_), movEdiEdi, sizeof(movEdiEdi)) == 0);
+			bool haveSpace = (memcmp(reinterpret_cast<void*>(this->pSource_), movEdiEdi, sizeof(movEdiEdi)) == 0);
 
-			uint8_t* pbCode = reinterpret_cast<uint8_t*>(pSource_) - MOLOGIE_DETOURS_DETOUR_SIZE;
+			uint8_t* pbCode = reinterpret_cast<uint8_t*>(this->pSource_) - MOLOGIE_DETOURS_DETOUR_SIZE;
 
 			for(size_t i = 0; i < MOLOGIE_DETOURS_DETOUR_SIZE; i++)
 			{
@@ -761,5 +776,3 @@ namespace MologieDetours
 }
 
 #endif // !INCLUDED_LIB_MOLOGIE_DETOURS_DETOURS_H
-
-#endif // header guard

@@ -356,7 +356,7 @@ void __cdecl lj_err_run_d( lua_State *state )
 #define LuaError( error ) return _LuaError( state, error );
 int _LuaError( lua_State *state, const char *error )
 {
-	static char temp_error[300];
+	char temp_error[300] = { 0 };
 	snprintf( temp_error, sizeof( temp_error ), "Failed to load LuaError. '%s' Contact me in Facepunch (danielga) or Steam (tuestu1) with this error.", error );
 	LUA->ThrowError( temp_error );
 	return 0;
@@ -554,21 +554,26 @@ GMOD_MODULE_OPEN( )
 
 #endif
 
+	try
+	{
+
 #if defined LUAERROR_SERVER
 
-	if( HandleClientLuaError != NULL )
 		HandleClientLuaError_detour = new MologieDetours::Detour<HandleClientLuaError_t>( HandleClientLuaError, HandleClientLuaError_d );
 
 #endif
 
-	if( CLuaGameCallback__LuaError != NULL )
 		CLuaGameCallback__LuaError_detour = new MologieDetours::Detour<CLuaGameCallback__LuaError_t>( CLuaGameCallback__LuaError, reinterpret_cast<CLuaGameCallback__LuaError_t>( CLuaGameCallback__LuaError_d ) );
 
-	if( lj_err_lex != NULL )
 		lj_err_lex_detour = new MologieDetours::Detour<lj_err_lex_t>( lj_err_lex, lj_err_lex_d );
 
-	if( lj_err_run != NULL )
 		lj_err_run_detour = new MologieDetours::Detour<lj_err_run_t>( lj_err_run, lj_err_run_d );
+
+	}
+	catch( std::runtime_error &e )
+	{
+		printf( "%s\n", e.what( ) );
+	}
 
 	lua->Msg( "[LuaError] Successfully loaded. Created by Daniel.\n" );
 	return 0;

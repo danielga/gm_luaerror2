@@ -39,18 +39,11 @@ struct DynLibInfo
 	size_t memorySize;
 };
 
-struct SymData
-{
-	std::string symbol_name;
-	void *symbol_pointer;
-};
-
 #if defined __linux || defined __APPLE__
 
 struct LibSymbolTable
 {
-	//std::map<const char *, void *> table;
-	std::vector<SymData> table;
+	std::map<std::string, void *> table;
 	uintptr_t lib_base;
 	uint32_t last_pos;
 };
@@ -152,15 +145,10 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 		symbolTables.push_back( libtable );
 	}
 
-	//std::map<const char *, void *> &table = libtable->table;
-	std::vector<SymData> &table = libtable->table;
-	//void *symbol_entry = table[symbol];
-	//if( symbol_entry != NULL )
-	//	return symbol_entry;
-
-	for( std::vector<SymData>::iterator it = table.begin( ); it != table.end( ); ++it )
-		if( ( *it ).symbol_name == symbol )
-			return ( *it ).symbol_pointer;
+	std::map<std::string, void *> &table = libtable->table;
+	void *symbol_ptr = table[symbol];
+	if( symbol_ptr != NULL )
+		return symbol_ptr;
 
 	struct stat dlstat;
 	int dlfile = open( dlmap->l_name, O_RDONLY );
@@ -217,9 +205,7 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 			continue;
 
 		void *symptr = (void *)( dlmap->l_addr + sym.st_value );
-		//table[sym_name] = symptr;
-		table.push_back( { sym_name, symptr } );
-
+		table[sym_name] = symptr;
 		if( strcmp( sym_name, symbol ) == 0 )
 		{
 			libtable->last_pos = ++i;
@@ -271,9 +257,9 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 	}
 
 	std::map<std::string, void *> &table = libtable->table;
-	void *symbol_entry = table[symbol];
-	if( symbol_entry != NULL )
-		return symbol_entry;
+	void *symbol_ptr = table[symbol];
+	if( symbol_ptr != NULL )
+		return symbol_ptr;
 
 	struct mach_header *file_hdr = (struct mach_header *)dlbase;
 	struct load_command *loadcmds = (struct load_command *)( dlbase + sizeof( struct mach_header ) );
@@ -315,11 +301,12 @@ void *SymbolFinder::FindSymbol( const void *handle, const char *symbol )
 		if( sym.n_sect == NO_SECT )
 			continue;
 
-		table[sym_name] = (void *)( dlbase + sym.n_value );
+		void *symptr = (void *)( dlmap->l_addr + sym.st_value );
+		table[sym_name] = symptr;
 		if( strcmp( sym_name, symbol ) == 0 )
 		{
 			libtable->last_pos = ++i;
-			symbol_pointer = (void *)( dlbase + sym.n_value );
+			symbol_pointer = symptr;
 			break;
 		}
 	}

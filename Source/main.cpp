@@ -554,6 +554,7 @@ GMOD_MODULE_OPEN( )
 
 #endif
 
+	bool failed = false;
 	try
 	{
 
@@ -570,10 +571,14 @@ GMOD_MODULE_OPEN( )
 		lj_err_run_detour = new MologieDetours::Detour<lj_err_run_t>( lj_err_run, lj_err_run_d );
 
 	}
-	catch( std::runtime_error &e )
+	catch( std::exception &e )
 	{
-		printf( "%s\n", e.what( ) );
+		failed = true;
+		LUA->PushString( e.what( ) );
 	}
+
+	if( failed )
+		LuaError( LUA->GetString( ) );
 
 	lua->Msg( "[LuaError] Successfully loaded. Created by Daniel.\n" );
 	return 0;

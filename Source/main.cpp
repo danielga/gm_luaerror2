@@ -10,6 +10,10 @@
 
 #if defined _WIN32
 
+#define CDECL __cdecl
+#define FASTCALL __fastcall
+#define THISCALL __thiscall
+
 #define snprintf _snprintf
 
 #if defined LUAERROR_SERVER
@@ -26,6 +30,8 @@
 
 #elif defined __linux
 
+#define CDECL __attribute__((cdecl))
+
 #if defined LUAERROR_SERVER
 
 #define MAIN_BINARY_FILE "garrysmod/bin/server_srv.so"
@@ -41,6 +47,8 @@
 #define SYMBOL_PREFIX "@"
 
 #elif defined __APPLE__
+
+#define CDECL __attribute__((cdecl))
 
 #if defined LUAERROR_SERVER
 
@@ -90,12 +98,12 @@ typedef void ( *Push_Entity_t ) ( CBaseEntity *entity );
 
 static Push_Entity_t Push_Entity = NULL;
 
-typedef void ( __cdecl *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
+typedef void ( CDECL *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
 
 static MologieDetours::Detour<HandleClientLuaError_t> *HandleClientLuaError_d = NULL;
 static HandleClientLuaError_t HandleClientLuaError = NULL;
 
-static void __cdecl HandleClientLuaError_h( CBasePlayer *player, const char *error )
+static void CDECL HandleClientLuaError_h( CBasePlayer *player, const char *error )
 {
 	lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
 	if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
@@ -151,7 +159,7 @@ static void __cdecl HandleClientLuaError_h( CBasePlayer *player, const char *err
 #define LJ_ERR_RUN_SYM reinterpret_cast<const uint8_t *>( "\x56\x57\x8B\x7C\x24\x0C\x8B\xCF\xE8\x2A\x2A\x2A\x2A\x85\xC0\x74" )
 #define LJ_ERR_RUN_SYMLEN 16
 
-typedef void ( __thiscall *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
+typedef void ( THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
 
 #elif defined __linux || defined __APPLE__
 
@@ -164,12 +172,12 @@ typedef void ( __thiscall *CLuaGameCallback__LuaError_t )( CLuaGameCallback *cal
 #define LJ_ERR_RUN_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "lj_err_run" )
 #define LJ_ERR_RUN_SYMLEN 0
 
-typedef void ( __cdecl *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
+typedef void ( CDECL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
 
 #endif
 
-typedef void ( __cdecl *lj_err_lex_t )( lua_State *state, void *src, const char *tok, int32_t line, int em, va_list argp );
-typedef void ( __cdecl *lj_err_run_t )( lua_State *state );
+typedef void ( CDECL *lj_err_lex_t )( lua_State *state, void *src, const char *tok, int32_t line, int em, va_list argp );
+typedef void ( CDECL *lj_err_run_t )( lua_State *state );
 
 static MologieDetours::Detour<CLuaGameCallback__LuaError_t> *CLuaGameCallback__LuaError_d = NULL;
 static CLuaGameCallback__LuaError_t CLuaGameCallback__LuaError = NULL;
@@ -234,11 +242,11 @@ static struct LuaErrorChain
 
 #if defined _WIN32
 
-static void __fastcall CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, void *, CLuaError *error )
+static void FASTCALL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, void *, CLuaError *error )
 
 #elif defined __linux || defined __APPLE__
 
-static void __cdecl CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, CLuaError *error )
+static void CDECL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, CLuaError *error )
 
 #endif
 
@@ -362,7 +370,7 @@ typedef enum
 
 #define err2msg( em ) ( lj_err_allmsg + ( em ) )
 
-static void __cdecl lj_err_lex_h( lua_State *state, void *src, const char *tok, int32_t line, int em, va_list argp )
+static void CDECL lj_err_lex_h( lua_State *state, void *src, const char *tok, int32_t line, int em, va_list argp )
 {
 	lua_error_chain.Clear( );
 
@@ -401,7 +409,7 @@ static void __cdecl lj_err_lex_h( lua_State *state, void *src, const char *tok, 
 	return lj_err_lex( state, src, tok, line, em, argp );
 }
 
-static void __cdecl lj_err_run_h( lua_State *state )
+static void CDECL lj_err_run_h( lua_State *state )
 {
 	lua_error_chain.Clear( );
 

@@ -1,10 +1,10 @@
-local GARRYSMOD_INCLUDES_PATH = "gmod-module-base/include"
-local project_folder = "Projects/" .. os.get() .. "/" .. _ACTION
+GARRYSMOD_INCLUDES_PATH = "../gmod-module-base/include"
+PROJECT_FOLDER = os.get() .. "/" .. _ACTION
+SOURCE_FOLDER = "../Source/"
 
 solution("gm_luaerror2")
-
 	language("C++")
-	location(project_folder)
+	location(PROJECT_FOLDER)
 	flags({"NoPCH", "ExtraWarnings"})
 
 	if os.is("macosx") then
@@ -18,21 +18,21 @@ solution("gm_luaerror2")
 	configuration("Debug")
 		defines({"DEBUG"})
 		flags({"Symbols"})
-		targetdir(project_folder .. "/Debug")
-		objdir(project_folder .. "/Intermediate")
+		targetdir(PROJECT_FOLDER .. "/Debug")
+		objdir(PROJECT_FOLDER .. "/Intermediate")
 
 	configuration("Release")
 		defines({"NDEBUG"})
 		flags({"Optimize", "EnableSSE"})
-		targetdir(project_folder .. "/Release")
-		objdir(project_folder .. "/Intermediate")
+		targetdir(PROJECT_FOLDER .. "/Release")
+		objdir(PROJECT_FOLDER .. "/Intermediate")
 
 	project("gmsv_luaerror2")
 		kind("SharedLib")
 		defines({"LUAERROR_SERVER", "GMMODULE"})
-		includedirs({"Source", GARRYSMOD_INCLUDES_PATH})
-		files({"Source/*.cpp", "Source/*.hpp", "Source/MologieDetours/hde.cpp", "Source/MologieDetours/detours.h"})
-		vpaths({["Header files/*"] = {"Source/**.hpp", "Source/**.h"}, ["Source files/*"] = {"Source/**.cpp", "Source/MologieDetours/**.cpp"}})
+		includedirs({SOURCE_FOLDER, GARRYSMOD_INCLUDES_PATH})
+		files({SOURCE_FOLDER .. "*.cpp", SOURCE_FOLDER .. "*.hpp", SOURCE_FOLDER .. "MologieDetours/hde.cpp", SOURCE_FOLDER .. "MologieDetours/detours.h"})
+		vpaths({["Header files/*"] = {SOURCE_FOLDER .. "**.hpp", SOURCE_FOLDER .. "**.h"}, ["Source files/*"] = {SOURCE_FOLDER .. "**.cpp", SOURCE_FOLDER .. "MologieDetours/**.cpp"}})
 		
 		targetprefix("gmsv_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")
@@ -51,9 +51,9 @@ solution("gm_luaerror2")
 	project("gmcl_luaerror2")
 		kind("SharedLib")
 		defines({"LUAERROR_CLIENT", "GMMODULE"})
-		includedirs({"Source", GARRYSMOD_INCLUDES_PATH})
-		files({"Source/*.cpp", "Source/*.hpp", "Source/MologieDetours/hde.cpp", "Source/MologieDetours/detours.h"})
-		vpaths({["Header files/*"] = {"Source/**.hpp", "Source/**.h"}, ["Source files/*"] = {"Source/**.cpp"}})
+		includedirs({SOURCE_FOLDER, GARRYSMOD_INCLUDES_PATH})
+		files({SOURCE_FOLDER .. "*.cpp", SOURCE_FOLDER .. "*.hpp", SOURCE_FOLDER .. "MologieDetours/hde.cpp", SOURCE_FOLDER .. "MologieDetours/detours.h"})
+		vpaths({["Header files/*"] = {SOURCE_FOLDER .. "**.hpp", SOURCE_FOLDER .. "**.h"}, ["Source files/*"] = {SOURCE_FOLDER .. "**.cpp", SOURCE_FOLDER .. "MologieDetours/**.cpp"}})
 
 		targetprefix("gmcl_") -- Just to remove prefixes like lib from Linux
 		targetname("luaerror2")

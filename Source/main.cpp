@@ -498,11 +498,11 @@ GMOD_MODULE_OPEN( )
 	if( CLuaGameCallback__LuaError == NULL )
 		LUA_ERROR( "Unable to sigscan function CLuaGameCallback::LuaError (" MAIN_BINARY_FILE ")." );
 
-	lj_err_lex = reinterpret_cast<lj_err_lex_t>( symfinder.FindPattern( LUA_SHARED_BINARY, LJ_ERR_LEX_SYM, LJ_ERR_LEX_SYMLEN ) );
+	lj_err_lex = reinterpret_cast<lj_err_lex_t>( symfinder.ResolveOnBinary( LUA_SHARED_BINARY, LJ_ERR_LEX_SYM, LJ_ERR_LEX_SYMLEN ) );
 	if( lj_err_lex == NULL )
 		LUA_ERROR( "Unable to sigscan function lj_err_lex (" LUA_SHARED_BINARY ")." );
 
-	lj_err_run = reinterpret_cast<lj_err_run_t>( symfinder.FindPattern( LUA_SHARED_BINARY, LJ_ERR_RUN_SYM, LJ_ERR_RUN_SYMLEN ) );
+	lj_err_run = reinterpret_cast<lj_err_run_t>( symfinder.ResolveOnBinary( LUA_SHARED_BINARY, LJ_ERR_RUN_SYM, LJ_ERR_RUN_SYMLEN ) );
 	if( lj_err_run == NULL )
 		LUA_ERROR( "Unable to sigscan function lj_err_run (" LUA_SHARED_BINARY ")." );
 

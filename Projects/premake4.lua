@@ -16,13 +16,11 @@ solution("gm_luaerror2")
 	configurations({"Debug", "Release"})
 
 	configuration("Debug")
-		defines({"DEBUG"})
 		flags({"Symbols"})
 		targetdir(PROJECT_FOLDER .. "/Debug")
 		objdir(PROJECT_FOLDER .. "/Intermediate")
 
 	configuration("Release")
-		defines({"NDEBUG"})
 		flags({"Optimize", "EnableSSE"})
 		targetdir(PROJECT_FOLDER .. "/Release")
 		objdir(PROJECT_FOLDER .. "/Intermediate")

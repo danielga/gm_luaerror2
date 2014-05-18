@@ -6,15 +6,14 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #if defined _WIN32
 
-#define CDECL __cdecl
-#define FASTCALL __fastcall
-#define THISCALL __thiscall
-
-#define snprintf _snprintf
+#define __CDECL __cdecl
+#define __FASTCALL __fastcall
+#define __THISCALL __thiscall
 
 #if defined LUAERROR_SERVER
 
@@ -30,7 +29,7 @@
 
 #elif defined __linux
 
-#define CDECL __attribute__((cdecl))
+#define __CDECL __attribute__((cdecl))
 
 #if defined LUAERROR_SERVER
 
@@ -48,7 +47,7 @@
 
 #elif defined __APPLE__
 
-#define CDECL __attribute__((cdecl))
+#define __CDECL __attribute__((cdecl))
 
 #if defined LUAERROR_SERVER
 
@@ -70,7 +69,6 @@ class CBaseEntity;
 class CBasePlayer;
 
 class CLuaGameCallback;
-class CLuaError;
 
 static GarrysMod::Lua::ILuaInterface *lua = NULL;
 
@@ -98,95 +96,77 @@ typedef void ( *Push_Entity_t ) ( CBaseEntity *entity );
 
 static Push_Entity_t Push_Entity = NULL;
 
-typedef void ( CDECL *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
+typedef void ( __CDECL *HandleClientLuaError_t ) ( CBasePlayer *player, const char *error );
 
 static MologieDetours::Detour<HandleClientLuaError_t> *HandleClientLuaError_d = NULL;
 static HandleClientLuaError_t HandleClientLuaError = NULL;
 
-static void CDECL HandleClientLuaError_h( CBasePlayer *player, const char *error )
+static int ClientLuaErrorHookCall( lua_State *state )
 {
-	lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
-	if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-	{
-		lua->GetField( -1, "hook" );
-		if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-		{
-			lua->GetField( -1, "Run" );
-			if( lua->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
-			{
-				lua->PushString( "ClientLuaError" );
-				Push_Entity( reinterpret_cast<CBaseEntity *>( player ) );
-				lua->PushString( error );
+	LUA->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
 
-				if( lua->PCall( 3, 1, 0 ) != 0 )
-				{
-					lua->Msg( "[ClientLuaError hook error] %s\n", lua->GetString( ) );
-					lua->Pop( 3 );
-					return HandleClientLuaError( player, error );
-				}
+	LUA->GetField( -1, "hook" );
 
-				if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) && lua->GetBool( ) )
-				{
-					lua->Pop( 3 );
-					return;
-				}
+	LUA->GetField( -1, "Run" );
 
-				lua->Pop( 1 );
-			}
-			else
-			{
-				lua->Pop( 1 );
-			}
-		}
+	LUA->PushString( "ClientLuaError" );
 
-		lua->Pop( 1 );
-	}
+	LUA->Push( 1 );
+	LUA->Push( 2 );
+
+	LUA->Call( 3, 1 );
+	return 1;
+}
+
+static void __CDECL HandleClientLuaError_h( CBasePlayer *player, const char *error )
+{
+	lua->PushCFunction( ClientLuaErrorHookCall );
+
+	Push_Entity( reinterpret_cast<CBaseEntity *>( player ) );
+	lua->PushString( error );
+
+	bool call_original = true;
+	if( lua->PCall( 2, 1, 0 ) != 0 )
+		lua->Msg( "[ClientLuaError hook error] %s\n", lua->GetString( -1 ) );
+	else if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) )
+		call_original = !lua->GetBool( -1 );
 
 	lua->Pop( 1 );
-	return HandleClientLuaError( player, error );
+
+	if( call_original )
+		HandleClientLuaError( player, error );
 }
 
 #endif
 
 #if defined _WIN32
 
+#define ADVANCEDLUAERRORREPORTER_SYM reinterpret_cast<const uint8_t *>( "\x55\x8B\xEC\x56\x8B\x75\x08\x6A\x01\x56\xE8\x2A\x2A\x2A\x2A\x83" )
+#define ADVANCEDLUAERRORREPORTER_SYMLEN 16
+
 #define CLUAGAMECALLBACK__LUAERROR_SYM reinterpret_cast<const uint8_t *>( "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xDB\x53\x89" )
 #define CLUAGAMECALLBACK__LUAERROR_SYMLEN 16
 
-#define LJ_ERR_LEX_SYM reinterpret_cast<const uint8_t *>( "\x81\xEC\x2A\x2A\x2A\x2A\x8B\x84\x24\x2A\x2A\x2A\x2A\x8B\x8C\x24" )
-#define LJ_ERR_LEX_SYMLEN 16
-
-#define LJ_ERR_RUN_SYM reinterpret_cast<const uint8_t *>( "\x56\x57\x8B\x7C\x24\x0C\x8B\xCF\xE8\x2A\x2A\x2A\x2A\x85\xC0\x74" )
-#define LJ_ERR_RUN_SYMLEN 16
-
-typedef void ( THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
+typedef void ( __THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, std::string &error );
 
 #elif defined __linux || defined __APPLE__
+
+#define ADVANCEDLUAERRORREPORTER_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "AdvancedLuaErrorReporter" )
+#define ADVANCEDLUAERRORREPORTER_SYMLEN 0
 
 #define CLUAGAMECALLBACK__LUAERROR_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError" )
 #define CLUAGAMECALLBACK__LUAERROR_SYMLEN 0
 
-#define LJ_ERR_LEX_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "lj_err_lex" )
-#define LJ_ERR_LEX_SYMLEN 0
-
-#define LJ_ERR_RUN_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "lj_err_run" )
-#define LJ_ERR_RUN_SYMLEN 0
-
-typedef void ( CDECL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, CLuaError *error );
+typedef void ( __CDECL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, std::string &error );
 
 #endif
 
-typedef void ( CDECL *lj_err_lex_t )( lua_State *state, void *src, const char *tok, int32_t line, int em, va_list argp );
-typedef void ( CDECL *lj_err_run_t )( lua_State *state );
+typedef int ( __CDECL *AdvancedLuaErrorReporter_t )( lua_State *state );
+
+static AdvancedLuaErrorReporter_t AdvancedLuaErrorReporter = NULL;
 
 static MologieDetours::Detour<CLuaGameCallback__LuaError_t> *CLuaGameCallback__LuaError_d = NULL;
 static CLuaGameCallback__LuaError_t CLuaGameCallback__LuaError = NULL;
-
-static MologieDetours::Detour<lj_err_lex_t> *lj_err_lex_d = NULL;
-static lj_err_lex_t lj_err_lex = NULL;
-
-static MologieDetours::Detour<lj_err_run_t> *lj_err_run_d = NULL;
-static lj_err_run_t lj_err_run = NULL;
 
 struct LuaDebug
 {
@@ -240,238 +220,163 @@ static struct LuaErrorChain
 	std::vector<LuaDebug> stack_data;
 } lua_error_chain;
 
+static void ParseErrorString( const std::string &error )
+{
+	if( error.size( ) == 0 )
+		return;
+
+	std::istringstream strstream( error );
+
+	std::getline( strstream, lua_error_chain.source_file, ':' );
+
+	strstream >> lua_error_chain.source_line;
+
+	strstream.ignore( 2 ); // remove : and <space>
+
+	std::getline( strstream, lua_error_chain.error_string );
+}
+
+static int __CDECL AdvancedLuaErrorReporter_d( lua_State *state )
+{
+	lua_error_chain.runtime = true;
+
+	ParseErrorString( LUA->GetString( 1 ) );
+
+	GarrysMod::Lua::ILuaInterface *lua_interface = reinterpret_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
+	lua_Debug dbg = { 0 };
+	for( int level = 0; lua_interface->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
+	{
+		lua_interface->GetInfo( "Slnu", &dbg );
+		lua_error_chain.stack_data.push_back( dbg );
+	}
+
+	return AdvancedLuaErrorReporter( state );
+}
+
+static int LuaErrorHookCall( lua_State *state )
+{
+	LUA->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
+
+	LUA->GetField( -1, "hook" );
+
+	LUA->GetField( -1, "Run" );
+
+	LUA->PushString( "LuaError" );
+
+	LUA->PushBool( lua_error_chain.runtime );
+	LUA->PushString( lua_error_chain.source_file.c_str( ) );
+	LUA->PushNumber( lua_error_chain.source_line );
+	LUA->PushString( lua_error_chain.error_string.c_str( ) );
+
+	int args = 5;
+	size_t stacksize = lua_error_chain.stack_data.size( );
+	if( stacksize > 0 )
+	{
+		args = 6;
+
+		LUA->CreateTable( );
+		for( size_t i = 0; i < stacksize; ++i )
+		{
+			LUA->PushNumber( i + 1 );
+			LUA->CreateTable( );
+
+			LuaDebug &stacklevel = lua_error_chain.stack_data[i];
+
+			LUA->PushNumber( stacklevel.event );
+			LUA->SetField( -2, "event" );
+
+			LUA->PushString( stacklevel.name.c_str( ) );
+			LUA->SetField( -2, "name" );
+
+			LUA->PushString( stacklevel.namewhat.c_str( ) );
+			LUA->SetField( -2, "namewhat" );
+
+			LUA->PushString( stacklevel.what.c_str( ) );
+			LUA->SetField( -2, "what" );
+
+			LUA->PushString( stacklevel.source.c_str( ) );
+			LUA->SetField( -2, "source" );
+
+			LUA->PushNumber( stacklevel.currentline );
+			LUA->SetField( -2, "currentline" );
+
+			LUA->PushNumber( stacklevel.nups );
+			LUA->SetField( -2, "nups" );
+
+			LUA->PushNumber( stacklevel.linedefined );
+			LUA->SetField( -2, "linedefined" );
+
+			LUA->PushNumber( stacklevel.lastlinedefined );
+			LUA->SetField( -2, "lastlinedefined" );
+
+			LUA->PushString( stacklevel.short_src.c_str( ) );
+			LUA->SetField( -2, "short_src" );
+
+			LUA->PushNumber( stacklevel.i_ci );
+			LUA->SetField( -2, "i_ci" );
+
+			LUA->SetTable( -3 );
+		}
+	}
+
+	LUA->Call( args, 1 );
+	return 1;
+}
+
 #if defined _WIN32
 
-static void FASTCALL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, void *, CLuaError *error )
+static void __FASTCALL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, void *, std::string &error )
 
 #elif defined __linux || defined __APPLE__
 
-static void CDECL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, CLuaError *error )
+static void __CDECL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, std::string &error )
 
 #endif
 
 {
-	size_t stacksize = lua_error_chain.stack_data.size( );
-	lua->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
-	if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
+	if( !lua_error_chain.runtime )
 	{
-		lua->GetField( -1, "hook" );
-		if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
+		ParseErrorString( error );
+
+		lua_Debug dbg = { 0 };
+		for( int level = 0; lua->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
 		{
-			lua->GetField( -1, "Run" );
-			if( lua->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
-			{
-				lua->PushString( "LuaError" );
-
-				lua->PushBool( lua_error_chain.runtime );
-
-				lua->PushString( lua_error_chain.source_file.c_str( ) );
-				lua->PushNumber( lua_error_chain.source_line );
-
-				lua->PushString( lua_error_chain.error_string.c_str( ) );
-
-				if( stacksize > 0 )
-				{
-					lua->CreateTable( );
-					if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-					{
-						for( size_t i = 0; i < stacksize; ++i )
-						{
-							lua->PushNumber( i + 1 );
-							lua->CreateTable( );
-							if( lua->IsType( -1, GarrysMod::Lua::Type::TABLE ) )
-							{
-								LuaDebug &stacklevel = lua_error_chain.stack_data[i];
-
-								lua->PushNumber( stacklevel.event );
-								lua->SetField( -2, "event" );
-
-								lua->PushString( stacklevel.name.c_str( ) );
-								lua->SetField( -2, "name" );
-
-								lua->PushString( stacklevel.namewhat.c_str( ) );
-								lua->SetField( -2, "namewhat" );
-
-								lua->PushString( stacklevel.what.c_str( ) );
-								lua->SetField( -2, "what" );
-
-								lua->PushString( stacklevel.source.c_str( ) );
-								lua->SetField( -2, "source" );
-
-								lua->PushNumber( stacklevel.currentline );
-								lua->SetField( -2, "currentline" );
-
-								lua->PushNumber( stacklevel.nups );
-								lua->SetField( -2, "nups" );
-
-								lua->PushNumber( stacklevel.linedefined );
-								lua->SetField( -2, "linedefined" );
-
-								lua->PushNumber( stacklevel.lastlinedefined );
-								lua->SetField( -2, "lastlinedefined" );
-
-								lua->PushString( stacklevel.short_src.c_str( ) );
-								lua->SetField( -2, "short_src" );
-
-								lua->PushNumber( stacklevel.i_ci );
-								lua->SetField( -2, "i_ci" );
-							}
-
-							lua->SetTable( -3 );
-						}
-					}
-
-					if( lua->PCall( 6, 1, 0 ) != 0 )
-					{
-						lua->Msg( "[LuaError hook error] %s\n", lua->GetString( ) );
-						lua->Pop( 3 );
-						return CLuaGameCallback__LuaError( callback, error );
-					}
-				}
-				else if( lua->PCall( 5, 1, 0 ) != 0 )
-				{
-					lua->Msg( "[LuaError hook error] %s\n", lua->GetString( ) );
-					lua->Pop( 3 );
-					return CLuaGameCallback__LuaError( callback, error );
-				}
-
-				if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) && lua->GetBool( ) )
-				{
-					lua->Pop( 3 );
-					return;
-				}
-
-				lua->Pop( 1 );
-			}
-			else
-			{
-				lua->Pop( 1 );
-			}
+			lua->GetInfo( "Slnu", &dbg );
+			lua_error_chain.stack_data.push_back( dbg );
 		}
-
-		lua->Pop( 1 );
 	}
+
+	lua->PushCFunction( LuaErrorHookCall );
+
+	bool call_original = true;
+	if( lua->PCall( 0, 1, 0 ) != 0 )
+		lua->Msg( "[LuaError hook error] %s\n", lua->GetString( -1 ) );
+	else if( lua->IsType( -1, GarrysMod::Lua::Type::BOOL ) )
+		call_original = !lua->GetBool( -1 );
 
 	lua->Pop( 1 );
-	return CLuaGameCallback__LuaError( callback, error );
-}
 
-static const char *lj_err_allmsg =
-#define ERRDEF( name, msg ) msg "\0"
-#include <lj_errmsg.h>
-;
-
-typedef enum
-{
-#define ERRDEF( name, msg ) LJ_ERR_##name, LJ_ERR_##name##_ = LJ_ERR_##name + sizeof( msg ) - 1,
-#include <lj_errmsg.h>
-	LJ_ERR__MAX
-} ErrMsg;
-
-#define err2msg( em ) ( lj_err_allmsg + ( em ) )
-
-static void CDECL lj_err_lex_h( lua_State *state, void *src, const char *tok, int32_t line, int em, va_list argp )
-{
 	lua_error_chain.Clear( );
 
-	lua_error_chain.runtime = false;
-
-	const char *srcstr = reinterpret_cast<const char *>( reinterpret_cast<uintptr_t>( src ) + 16 );
-	if( *srcstr == '@' )
-		++srcstr;
-
-	lua_error_chain.source_file = srcstr;
-	lua_error_chain.source_line = line;
-
-	int size = 256;
-	lua_error_chain.error_string.resize( size );
-	if( tok != NULL )
-	{
-		char temp[256] = { 0 };
-		vsnprintf( temp, sizeof( temp ), err2msg( em ), argp );
-		size = snprintf( &lua_error_chain.error_string[0], size, err2msg( LJ_ERR_XNEAR ), temp, tok );
-	}
-	else
-	{
-		size = vsnprintf( &lua_error_chain.error_string[0], size, err2msg( em ), argp );
-	}
-
-	lua_error_chain.error_string.resize( size );
-
-	GarrysMod::Lua::ILuaInterface *lua_interface = reinterpret_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
-	lua_Debug dbg = { 0 };
-	for( int level = 0; lua_interface->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
-	{
-		lua_interface->GetInfo( "Slnu", &dbg );
-		lua_error_chain.stack_data.push_back( dbg );
-	}
-
-	return lj_err_lex( state, src, tok, line, em, argp );
-}
-
-static void CDECL lj_err_run_h( lua_State *state )
-{
-	lua_error_chain.Clear( );
-
-	lua_error_chain.runtime = true;
-
-	int top = LUA->Top( );
-	const char *error = LUA->GetString( top > 1 ? top - 1 : 1 );
-	if( error != NULL )
-		lua_error_chain.error_string = error;
-
-	GarrysMod::Lua::ILuaInterface *lua_interface = reinterpret_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
-	lua_Debug dbg = { 0 };
-	for( int level = 0; lua_interface->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
-	{
-		lua_interface->GetInfo( "Slnu", &dbg );
-		lua_error_chain.stack_data.push_back( dbg );
-	}
-
-	if( top > 0 )
-	{
-		const char *src = LUA->GetString( top );
-		if( src != NULL )
-		{
-			lua_error_chain.source_file = src;
-			size_t pos1 = lua_error_chain.source_file.find( ':' );
-			size_t pos2 = lua_error_chain.source_file.find( ':', pos1 + 1 );
-			if( pos1 != lua_error_chain.source_file.npos && pos2 != lua_error_chain.source_file.npos )
-			{
-				const char *linestart = &lua_error_chain.source_file[pos1 + 1];	
-				const char *lineend = &lua_error_chain.source_file[pos2];
-				char *linecheck = NULL;
-				int line = strtol( linestart, &linecheck, 10 );
-				if( linecheck == lineend )
-				{
-					lua_error_chain.source_line = line;
-					lua_error_chain.source_file.resize( pos1 );
-					return lj_err_run( state );
-				}
-			}
-		}
-	}
-
-	if( lua_error_chain.stack_data.size( ) > 0 )
-	{
-		LuaDebug &debug = lua_error_chain.stack_data[0];
-		lua_error_chain.source_file = debug.short_src;
-		lua_error_chain.source_line = debug.currentline;
-	}
-	else
-	{
-		lua_error_chain.source_file = "[C]";
-		lua_error_chain.source_line = -1;
-	}
-
-	return lj_err_run( state );
+	if( call_original )
+		CLuaGameCallback__LuaError_d->GetOriginalFunction( )( callback, error );
 }
 
 #define LUA_ERROR( error ) return _LuaError( state, error );
 int _LuaError( lua_State *state, const char *error )
 {
 	char temp_error[300] = { 0 };
+
+#if defined _WIN32
+
+	_snprintf_s( temp_error, sizeof( temp_error ), "Failed to load LuaError. '%s' Contact me in Facepunch (danielga) or Steam (tuestu1) with this error.", error );
+
+#else
+
 	snprintf( temp_error, sizeof( temp_error ), "Failed to load LuaError. '%s' Contact me in Facepunch (danielga) or Steam (tuestu1) with this error.", error );
+
+#endif
+
 	LUA->ThrowError( temp_error );
 	return 0;
 }
@@ -479,6 +384,23 @@ int _LuaError( lua_State *state, const char *error )
 GMOD_MODULE_OPEN( )
 {
 	lua = reinterpret_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
+
+	LUA->PushSpecial( GarrysMod::Lua::SPECIAL_REG );
+
+	LUA->PushNumber( 1 );
+	LUA->GetTable( -2 );
+	if( LUA->IsType( -1, GarrysMod::Lua::Type::FUNCTION ) )
+	{
+		LUA->Pop( 1 );
+
+		LUA->PushNumber( 1 );
+		LUA->PushCFunction( AdvancedLuaErrorReporter_d );
+		LUA->SetTable( -3 );
+
+		LUA->Pop( 1 );
+	}
+	else
+		LUA_ERROR( "Unable to detour AdvancedLuaErrorReporter." );
 
 	SymbolFinder symfinder;
 
@@ -494,17 +416,13 @@ GMOD_MODULE_OPEN( )
 
 #endif
 
+	AdvancedLuaErrorReporter = reinterpret_cast<AdvancedLuaErrorReporter_t>( symfinder.ResolveOnBinary( LUA_SHARED_BINARY, ADVANCEDLUAERRORREPORTER_SYM, ADVANCEDLUAERRORREPORTER_SYMLEN ) );
+	if( AdvancedLuaErrorReporter == NULL )
+		LUA_ERROR( "Unable to sigscan function AdvancedLuaErrorReporter (" LUA_SHARED_BINARY ")." );
+
 	CLuaGameCallback__LuaError = reinterpret_cast<CLuaGameCallback__LuaError_t>( symfinder.ResolveOnBinary( MAIN_BINARY_FILE, CLUAGAMECALLBACK__LUAERROR_SYM, CLUAGAMECALLBACK__LUAERROR_SYMLEN ) );
 	if( CLuaGameCallback__LuaError == NULL )
 		LUA_ERROR( "Unable to sigscan function CLuaGameCallback::LuaError (" MAIN_BINARY_FILE ")." );
-
-	lj_err_lex = reinterpret_cast<lj_err_lex_t>( symfinder.ResolveOnBinary( LUA_SHARED_BINARY, LJ_ERR_LEX_SYM, LJ_ERR_LEX_SYMLEN ) );
-	if( lj_err_lex == NULL )
-		LUA_ERROR( "Unable to sigscan function lj_err_lex (" LUA_SHARED_BINARY ")." );
-
-	lj_err_run = reinterpret_cast<lj_err_run_t>( symfinder.ResolveOnBinary( LUA_SHARED_BINARY, LJ_ERR_RUN_SYM, LJ_ERR_RUN_SYMLEN ) );
-	if( lj_err_run == NULL )
-		LUA_ERROR( "Unable to sigscan function lj_err_run (" LUA_SHARED_BINARY ")." );
 
 	try
 	{
@@ -518,12 +436,6 @@ GMOD_MODULE_OPEN( )
 
 		CLuaGameCallback__LuaError_d = new MologieDetours::Detour<CLuaGameCallback__LuaError_t>( CLuaGameCallback__LuaError, reinterpret_cast<CLuaGameCallback__LuaError_t>( CLuaGameCallback__LuaError_h ) );
 		CLuaGameCallback__LuaError = CLuaGameCallback__LuaError_d->GetOriginalFunction( );
-
-		lj_err_lex_d = new MologieDetours::Detour<lj_err_lex_t>( lj_err_lex, lj_err_lex_h );
-		lj_err_lex = lj_err_lex_d->GetOriginalFunction( );
-
-		lj_err_run_d = new MologieDetours::Detour<lj_err_run_t>( lj_err_run, lj_err_run_h );
-		lj_err_run = lj_err_run_d->GetOriginalFunction( );
 
 		lua->Msg( "[LuaError] Successfully loaded. Created by Daniel.\n" );
 		return 0;
@@ -544,17 +456,13 @@ GMOD_MODULE_OPEN( )
 	if( CLuaGameCallback__LuaError_d != NULL )
 		delete CLuaGameCallback__LuaError_d;
 
-	if( lj_err_lex_d != NULL )
-		delete lj_err_lex_d;
-
-	if( lj_err_run_d != NULL )
-		delete lj_err_run_d;
-
 	LUA_ERROR( LUA->GetString( ) );
 }
 
 GMOD_MODULE_CLOSE( )
 {
+	// classic C one-liner to remove "useless" warnings.
+	(void)state;
 
 #if defined LUAERROR_SERVER
 
@@ -563,10 +471,6 @@ GMOD_MODULE_CLOSE( )
 #endif
 
 	delete CLuaGameCallback__LuaError_d;
-
-	delete lj_err_lex_d;
-
-	delete lj_err_run_d;
 
 	lua->Msg( "[LuaError] Successfully unloaded. Thank you for using LuaError. Created by Daniel.\n" );
 	return 0;

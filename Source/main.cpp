@@ -151,7 +151,7 @@ typedef void ( __THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *cal
 
 #elif defined __linux || defined __APPLE__
 
-#define ADVANCEDLUAERRORREPORTER_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "AdvancedLuaErrorReporter" )
+#define ADVANCEDLUAERRORREPORTER_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "_Z24AdvancedLuaErrorReporterP9lua_State" )
 #define ADVANCEDLUAERRORREPORTER_SYMLEN 0
 
 #define CLUAGAMECALLBACK__LUAERROR_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError" )

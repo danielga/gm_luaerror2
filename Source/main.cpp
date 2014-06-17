@@ -141,9 +141,6 @@ static void __CDECL HandleClientLuaError_h( CBasePlayer *player, const char *err
 
 #if defined _WIN32
 
-#define ADVANCEDLUAERRORREPORTER_SYM reinterpret_cast<const uint8_t *>( "\x55\x8B\xEC\x56\x8B\x75\x08\x6A\x01\x56\xE8\x2A\x2A\x2A\x2A\x83" )
-#define ADVANCEDLUAERRORREPORTER_SYMLEN 16
-
 #define CLUAGAMECALLBACK__LUAERROR_SYM reinterpret_cast<const uint8_t *>( "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xDB\x53\x89" )
 #define CLUAGAMECALLBACK__LUAERROR_SYMLEN 16
 
@@ -151,19 +148,12 @@ typedef void ( __THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *cal
 
 #elif defined __linux || defined __APPLE__
 
-#define ADVANCEDLUAERRORREPORTER_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "_Z24AdvancedLuaErrorReporterP9lua_State" )
-#define ADVANCEDLUAERRORREPORTER_SYMLEN 0
-
 #define CLUAGAMECALLBACK__LUAERROR_SYM reinterpret_cast<const uint8_t *>( SYMBOL_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError" )
 #define CLUAGAMECALLBACK__LUAERROR_SYMLEN 0
 
 typedef void ( __CDECL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, std::string &error );
 
 #endif
-
-typedef int ( __CDECL *AdvancedLuaErrorReporter_t )( lua_State *state );
-
-static AdvancedLuaErrorReporter_t AdvancedLuaErrorReporter = NULL;
 
 static MologieDetours::Detour<CLuaGameCallback__LuaError_t> *CLuaGameCallback__LuaError_d = NULL;
 static CLuaGameCallback__LuaError_t CLuaGameCallback__LuaError = NULL;
@@ -236,7 +226,9 @@ static void ParseErrorString( const std::string &error )
 	std::getline( strstream, lua_error_chain.error_string );
 }
 
-static int __CDECL AdvancedLuaErrorReporter_d( lua_State *state )
+int reporter_ref = -1;
+
+static int __CDECL AdvancedLuaErrorReporter( lua_State *state )
 {
 	lua_error_chain.runtime = true;
 
@@ -250,7 +242,10 @@ static int __CDECL AdvancedLuaErrorReporter_d( lua_State *state )
 		lua_error_chain.stack_data.push_back( dbg );
 	}
 
-	return AdvancedLuaErrorReporter( state );
+	LUA->ReferencePush( reporter_ref );
+	LUA->Push( 1 );
+	LUA->Call( 1, 1 );
+	return 1;
 }
 
 static int LuaErrorHookCall( lua_State *state )
@@ -394,7 +389,11 @@ GMOD_MODULE_OPEN( )
 		LUA->Pop( 1 );
 
 		LUA->PushNumber( 1 );
-		LUA->PushCFunction( AdvancedLuaErrorReporter_d );
+		LUA->GetTable( -2 );
+		reporter_ref = LUA->ReferenceCreate( );
+
+		LUA->PushNumber( 1 );
+		LUA->PushCFunction( AdvancedLuaErrorReporter );
 		LUA->SetTable( -3 );
 
 		LUA->Pop( 1 );
@@ -415,10 +414,6 @@ GMOD_MODULE_OPEN( )
 		LUA_ERROR( "Unable to sigscan function Push_Entity (" MAIN_BINARY_FILE ")." );
 
 #endif
-
-	AdvancedLuaErrorReporter = reinterpret_cast<AdvancedLuaErrorReporter_t>( symfinder.ResolveOnBinary( LUA_SHARED_BINARY, ADVANCEDLUAERRORREPORTER_SYM, ADVANCEDLUAERRORREPORTER_SYMLEN ) );
-	if( AdvancedLuaErrorReporter == NULL )
-		LUA_ERROR( "Unable to sigscan function AdvancedLuaErrorReporter (" LUA_SHARED_BINARY ")." );
 
 	CLuaGameCallback__LuaError = reinterpret_cast<CLuaGameCallback__LuaError_t>( symfinder.ResolveOnBinary( MAIN_BINARY_FILE, CLUAGAMECALLBACK__LUAERROR_SYM, CLUAGAMECALLBACK__LUAERROR_SYMLEN ) );
 	if( CLuaGameCallback__LuaError == NULL )

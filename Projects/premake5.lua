@@ -27,7 +27,7 @@ solution("gm_luaerror2")
 
 	project("gmsv_luaerror2")
 		kind("SharedLib")
-		defines({"GMMODULE", "LUAERROR_SERVER", "CLIENT_DLL", "SUPPRESS_INVALID_PARAMETER_NO_INFO"})
+		defines({"GMMODULE", "LUAERROR_SERVER", "GAME_DLL"})
 		includedirs({
 			SOURCE_FOLDER,
 			GARRYSMOD_MODULE_BASE_FOLDER .. "/include",
@@ -58,6 +58,7 @@ solution("gm_luaerror2")
 		targetextension(".dll")
 
 		filter("system:windows")
+			defines({"SUPPRESS_INVALID_PARAMETER_NO_INFO"})
 			libdirs({SDK_FOLDER .. "/lib/public"})
 			targetsuffix("_win32")
 
@@ -77,7 +78,7 @@ solution("gm_luaerror2")
 
 	project("gmcl_luaerror2")
 		kind("SharedLib")
-		defines({"GMMODULE", "LUAERROR_CLIENT", "GAME_DLL", "SUPPRESS_INVALID_PARAMETER_NO_INFO"})
+		defines({"GMMODULE", "LUAERROR_CLIENT", "CLIENT_DLL"})
 		includedirs({
 			SOURCE_FOLDER,
 			GARRYSMOD_MODULE_BASE_FOLDER .. "/include",
@@ -108,6 +109,7 @@ solution("gm_luaerror2")
 		targetextension(".dll")
 
 		filter("system:windows")
+			defines({"SUPPRESS_INVALID_PARAMETER_NO_INFO"})
 			libdirs({SDK_FOLDER .. "/lib/public"})
 			targetsuffix("_win32")
 

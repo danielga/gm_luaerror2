@@ -55,9 +55,11 @@ solution("gm_luaerror2")
 			targetsuffix("_win32")
 
 		filter("system:linux")
+			links({"dl"})
 			targetsuffix("_linux")
 
 		filter({"system:macosx"})
+			links({"dl"})
 			targetsuffix("_mac")
 
 	project("gmcl_luaerror2")
@@ -91,7 +93,9 @@ solution("gm_luaerror2")
 			targetsuffix("_win32")
 
 		filter("system:linux")
+			links({"dl"})
 			targetsuffix("_linux")
 
 		filter({"system:macosx"})
+			links({"dl"})
 			targetsuffix("_mac")

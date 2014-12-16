@@ -1,4 +1,6 @@
 GARRYSMOD_MODULE_BASE_FOLDER = "../gmod-module-base"
+SCANNING_FOLDER = "../scanning"
+DETOURING_FOLDER = "../detouring"
 SOURCE_FOLDER = "../Source"
 PROJECT_FOLDER = os.get() .. "/" .. _ACTION
 
@@ -29,22 +31,20 @@ solution("gm_luaerror2")
 		defines({"GMMODULE", "LUAERROR_SERVER"})
 		includedirs({
 			SOURCE_FOLDER,
-			GARRYSMOD_MODULE_BASE_FOLDER .. "/include"
+			GARRYSMOD_MODULE_BASE_FOLDER .. "/include",
+			SCANNING_FOLDER,
+			DETOURING_FOLDER
 		})
 		files({
 			SOURCE_FOLDER .. "/*.cpp",
-			SOURCE_FOLDER .. "/*.hpp",
-			SOURCE_FOLDER .. "/MologieDetours/hde.cpp",
-			SOURCE_FOLDER .. "/MologieDetours/detours.h"
+			SCANNING_FOLDER .. "/SymbolFinder.cpp",
+			DETOURING_FOLDER .. "/hde.cpp"
 		})
 		vpaths({
-			["Header files"] = {
-				SOURCE_FOLDER .. "/**.hpp",
-				SOURCE_FOLDER .. "/**.h"
-			},
 			["Source files"] = {
 				SOURCE_FOLDER .. "/**.cpp",
-				SOURCE_FOLDER .. "/MologieDetours/**.cpp"
+				SCANNING_FOLDER .. "/**.cpp",
+				DETOURING_FOLDER .. "/**.cpp"
 			}
 		})
 
@@ -56,10 +56,12 @@ solution("gm_luaerror2")
 
 		filter("system:linux")
 			links({"dl"})
+			buildoptions({"-std=c++11"})
 			targetsuffix("_linux")
 
 		filter({"system:macosx"})
 			links({"dl"})
+			buildoptions({"-std=c++11"})
 			targetsuffix("_mac")
 
 	project("gmcl_luaerror2")
@@ -67,22 +69,20 @@ solution("gm_luaerror2")
 		defines({"GMMODULE", "LUAERROR_CLIENT"})
 		includedirs({
 			SOURCE_FOLDER,
-			GARRYSMOD_MODULE_BASE_FOLDER .. "/include"
+			GARRYSMOD_MODULE_BASE_FOLDER .. "/include",
+			SCANNING_FOLDER,
+			DETOURING_FOLDER
 		})
 		files({
 			SOURCE_FOLDER .. "/*.cpp",
-			SOURCE_FOLDER .. "/*.hpp",
-			SOURCE_FOLDER .. "/MologieDetours/hde.cpp",
-			SOURCE_FOLDER .. "/MologieDetours/detours.h"
+			SCANNING_FOLDER .. "/SymbolFinder.cpp",
+			DETOURING_FOLDER .. "/hde.cpp"
 		})
 		vpaths({
-			["Header files"] = {
-				SOURCE_FOLDER .. "/**.hpp",
-				SOURCE_FOLDER .. "/**.h"
-			},
 			["Source files"] = {
 				SOURCE_FOLDER .. "/**.cpp",
-				SOURCE_FOLDER .. "/MologieDetours/**.cpp"
+				SCANNING_FOLDER .. "/**.cpp",
+				DETOURING_FOLDER .. "/**.cpp"
 			}
 		})
 
@@ -94,8 +94,10 @@ solution("gm_luaerror2")
 
 		filter("system:linux")
 			links({"dl"})
+			buildoptions({"-std=c++11"})
 			targetsuffix("_linux")
 
 		filter({"system:macosx"})
 			links({"dl"})
+			buildoptions({"-std=c++11"})
 			targetsuffix("_mac")

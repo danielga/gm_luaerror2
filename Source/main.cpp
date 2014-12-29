@@ -15,8 +15,6 @@
 	#define __FASTCALL __fastcall
 	#define __THISCALL __thiscall
 
-	#define LUA_SHARED_BINARY "lua_shared.dll"
-
 	#if defined LUAERROR_SERVER
 
 		#define MAIN_BINARY_FILE "server.dll"
@@ -24,7 +22,7 @@
 		#define PUSH_ENTITY_SYM "\x55\x8B\xEC\x83\xEC\x14\x83\x3D\x2A\x2A\x2A\x2A\x2A\x74\x2A\x8B"
 		#define PUSH_ENTITY_SYMLEN 16
 
-		#define HANDLECLIENTLUAERROR_SYM "\x55\x8B\xEC\x83\xEC\x08\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x53\x56"
+		#define HANDLECLIENTLUAERROR_SYM "\x55\x89\xE5\x57\x56\x8D\x7D\xE0\x53\x83\xEC\x4C\x65\xA1\x2A\x2A"
 		#define HANDLECLIENTLUAERROR_SYMLEN 16
 
 	#elif defined LUAERROR_CLIENT
@@ -36,51 +34,50 @@
 	#define CLUAGAMECALLBACK__LUAERROR_SYM "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xDB\x53\x89"
 	#define CLUAGAMECALLBACK__LUAERROR_SYMLEN 16
 
-#elif defined __linux || defined __APPLE__
+#elif defined __linux
 
 	#define __CDECL __attribute__((cdecl))
 
-	#if defined __linux
+	#define SYMBOL_PREFIX "@"
 
-		#define SYMBOL_PREFIX "@"
+	#if defined LUAERROR_SERVER
 
-		#if defined LUAERROR_SERVER
+		#define MAIN_BINARY_FILE "garrysmod/bin/server_srv.so"
 
-			#define LUA_SHARED_BINARY "garrysmod/bin/lua_shared_srv.so"
-			#define MAIN_BINARY_FILE "garrysmod/bin/server_srv.so"
+		#define PUSH_ENTITY_SYM "\x55\x89\xE5\x53\x83\xEC\x44\x8B\x15\x2A\x2A\x2A\x2A\x8B\x45\x08"
+		#define PUSH_ENTITY_SYMLEN 16
 
-		#elif defined LUAERROR_CLIENT
+		#define HANDLECLIENTLUAERROR_SYM "\x55\x8B\xEC\x83\xEC\x08\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x53\x56"
+		#define HANDLECLIENTLUAERROR_SYMLEN 16
 
-			#define LUA_SHARED_BINARY "garrysmod/bin/lua_shared.so"
-			#define MAIN_BINARY_FILE "garrysmod/bin/client.so"
+	#elif defined LUAERROR_CLIENT
 
-		#endif
-
-	#else
-
-		#define SYMBOL_PREFIX "@_"
-
-		#define LUA_SHARED_BINARY "garrysmod/bin/lua_shared.dylib"
-
-		#if defined LUAERROR_SERVER
-
-			#define MAIN_BINARY_FILE "garrysmod/bin/server.dylib"
-
-		#elif defined LUAERROR_CLIENT
-
-			#define MAIN_BINARY_FILE "garrysmod/bin/client.dylib"
-
-		#endif
+		#define MAIN_BINARY_FILE "garrysmod/bin/client.so"
 
 	#endif
 
+	#define CLUAGAMECALLBACK__LUAERROR_SYM "\x55\x89\xE5\x57\x56\x8D\x45\xCF\x53\x81\xEC\x2A\x2A\x2A\x2A\x89"
+	#define CLUAGAMECALLBACK__LUAERROR_SYMLEN 16
+
+#elif defined __APPLE__
+
+	#define __CDECL __attribute__((cdecl))
+
+	#define SYMBOL_PREFIX "@_"
+
 	#if defined LUAERROR_SERVER
+
+		#define MAIN_BINARY_FILE "garrysmod/bin/server.dylib"
 
 		#define PUSH_ENTITY_SYM SYMBOL_PREFIX "_Z11Push_EntityP11CBaseEntity"
 		#define PUSH_ENTITY_SYMLEN 0
 
 		#define HANDLECLIENTLUAERROR_SYM SYMBOL_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc"
 		#define HANDLECLIENTLUAERROR_SYMLEN 0
+
+	#elif defined LUAERROR_CLIENT
+
+		#define MAIN_BINARY_FILE "garrysmod/bin/client.dylib"
 
 	#endif
 

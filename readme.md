@@ -1,7 +1,7 @@
 gm_luaerror2
 ============
 
-A module for GMod that adds hooks for obtaining errors that happen on the client and server (if activated on server, it also pushes errors from clients).
+A module for Garry's Mod that adds hooks for obtaining errors that happen on the client and server (if activated on server, it also pushes errors from clients).
 
 Info
 -------

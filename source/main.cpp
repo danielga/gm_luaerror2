@@ -1,6 +1,6 @@
 #include <GarrysMod/Lua/Interface.h>
 #include <GarrysMod/Lua/LuaInterface.h>
-#include <SymbolFinder.hpp>
+#include <symbolfinder.hpp>
 #include <detours.h>
 #include <cstdio>
 #include <cstdlib>

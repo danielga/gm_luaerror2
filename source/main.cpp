@@ -1,5 +1,6 @@
 #include <GarrysMod/Lua/Interface.h>
 #include <GarrysMod/Lua/LuaInterface.h>
+#include <lua.hpp>
 #include <symbolfinder.hpp>
 #include <detours.h>
 #include <cstdio>
@@ -15,7 +16,7 @@
 	#define __FASTCALL __fastcall
 	#define __THISCALL __thiscall
 
-	#if defined LUAERROR_SERVER
+	#if defined LUAERROR2_SERVER
 
 		#define MAIN_BINARY_FILE "server.dll"
 
@@ -25,7 +26,7 @@
 		#define HANDLECLIENTLUAERROR_SYM "\x55\x89\xE5\x57\x56\x8D\x7D\xE0\x53\x83\xEC\x4C\x65\xA1\x2A\x2A"
 		#define HANDLECLIENTLUAERROR_SYMLEN 16
 
-	#elif defined LUAERROR_CLIENT
+	#elif defined LUAERROR2_CLIENT
 
 		#define MAIN_BINARY_FILE "client.dll"
 
@@ -40,7 +41,7 @@
 
 	#define SYMBOL_PREFIX "@"
 
-	#if defined LUAERROR_SERVER
+	#if defined LUAERROR2_SERVER
 
 		#define MAIN_BINARY_FILE "garrysmod/bin/server_srv.so"
 
@@ -50,7 +51,7 @@
 		#define HANDLECLIENTLUAERROR_SYM "\x55\x8B\xEC\x83\xEC\x08\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x53\x56"
 		#define HANDLECLIENTLUAERROR_SYMLEN 16
 
-	#elif defined LUAERROR_CLIENT
+	#elif defined LUAERROR2_CLIENT
 
 		#define MAIN_BINARY_FILE "garrysmod/bin/client.so"
 
@@ -65,7 +66,7 @@
 
 	#define SYMBOL_PREFIX "@_"
 
-	#if defined LUAERROR_SERVER
+	#if defined LUAERROR2_SERVER
 
 		#define MAIN_BINARY_FILE "garrysmod/bin/server.dylib"
 
@@ -75,7 +76,7 @@
 		#define HANDLECLIENTLUAERROR_SYM SYMBOL_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc"
 		#define HANDLECLIENTLUAERROR_SYMLEN 0
 
-	#elif defined LUAERROR_CLIENT
+	#elif defined LUAERROR2_CLIENT
 
 		#define MAIN_BINARY_FILE "garrysmod/bin/client.dylib"
 
@@ -93,9 +94,9 @@ class CLuaGameCallback;
 
 static GarrysMod::Lua::ILuaInterface *lua = nullptr;
 
-static int reporter_ref = -1;
+static int32_t reporter_ref = -1;
 
-#if defined LUAERROR_SERVER
+#if defined LUAERROR2_SERVER
 
 typedef void ( *Push_Entity_t )( CBaseEntity *entity );
 
@@ -106,7 +107,7 @@ typedef void ( __CDECL *HandleClientLuaError_t )( CBasePlayer *player, const cha
 static MologieDetours::Detour<HandleClientLuaError_t> *HandleClientLuaError_d = nullptr;
 static HandleClientLuaError_t HandleClientLuaError = nullptr;
 
-static int ClientLuaErrorHookCall( lua_State *state )
+LUA_FUNCTION_STATIC( ClientLuaErrorHookCall )
 {
 	LUA->PushSpecial( GarrysMod::Lua::SPECIAL_GLOB );
 
@@ -172,17 +173,17 @@ struct LuaDebug
 		i_ci( debug.i_ci )
 	{ }
 
-	int event;
+	int32_t event;
 	std::string name;
 	std::string namewhat;
 	std::string what;
 	std::string source;
-	int currentline;
-	int nups;
-	int linedefined;
-	int lastlinedefined;
+	int32_t currentline;
+	int32_t nups;
+	int32_t linedefined;
+	int32_t lastlinedefined;
 	std::string short_src;
-	int i_ci;
+	int32_t i_ci;
 };
 
 static struct LuaErrorChain
@@ -203,7 +204,7 @@ static struct LuaErrorChain
 
 	bool runtime;
 	std::string source_file;
-	int source_line;
+	int32_t source_line;
 	std::string error_string;
 	std::vector<LuaDebug> stack_data;
 } lua_error_chain;
@@ -224,7 +225,7 @@ static void ParseErrorString( const std::string &error )
 	std::getline( strstream, lua_error_chain.error_string );
 }
 
-static int __CDECL AdvancedLuaErrorReporter( lua_State *state )
+LUA_FUNCTION_STATIC( AdvancedLuaErrorReporter )
 {
 	lua_error_chain.runtime = true;
 
@@ -232,7 +233,7 @@ static int __CDECL AdvancedLuaErrorReporter( lua_State *state )
 
 	GarrysMod::Lua::ILuaInterface *lua_interface = reinterpret_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
 	lua_Debug dbg = { 0 };
-	for( int level = 0; lua_interface->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
+	for( int32_t level = 0; lua_interface->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
 	{
 		lua_interface->GetInfo( "Slnu", &dbg );
 		lua_error_chain.stack_data.push_back( dbg );
@@ -259,7 +260,7 @@ LUA_FUNCTION_STATIC( LuaErrorHookCall )
 	LUA->PushNumber( lua_error_chain.source_line );
 	LUA->PushString( lua_error_chain.error_string.c_str( ) );
 
-	int args = 5;
+	int32_t args = 5;
 	size_t stacksize = lua_error_chain.stack_data.size( );
 	if( stacksize > 0 )
 	{
@@ -330,7 +331,7 @@ static void __CDECL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, st
 		ParseErrorString( error );
 
 		lua_Debug dbg = { 0 };
-		for( int level = 0; lua->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
+		for( int32_t level = 0; lua->GetStack( level, &dbg ) == 1; ++level, memset( &dbg, 0, sizeof( dbg ) ) )
 		{
 			lua->GetInfo( "Slnu", &dbg );
 			lua_error_chain.stack_data.push_back( dbg );
@@ -384,7 +385,7 @@ GMOD_MODULE_OPEN( )
 
 	SymbolFinder symfinder;
 
-#if defined LUAERROR_SERVER
+#if defined LUAERROR2_SERVER
 
 	HandleClientLuaError = reinterpret_cast<HandleClientLuaError_t>( symfinder.ResolveOnBinary( MAIN_BINARY_FILE, HANDLECLIENTLUAERROR_SYM, HANDLECLIENTLUAERROR_SYMLEN ) );
 	if( HandleClientLuaError == nullptr )
@@ -403,7 +404,7 @@ GMOD_MODULE_OPEN( )
 	try
 	{
 
-#if defined LUAERROR_SERVER
+#if defined LUAERROR2_SERVER
 
 		HandleClientLuaError_d = new MologieDetours::Detour<HandleClientLuaError_t>( HandleClientLuaError, HandleClientLuaError_h );
 		HandleClientLuaError = HandleClientLuaError_d->GetOriginalFunction( );
@@ -418,7 +419,7 @@ GMOD_MODULE_OPEN( )
 	catch( std::exception & )
 	{ }
 
-#if defined LUAERROR_SERVER
+#if defined LUAERROR2_SERVER
 
 	if( HandleClientLuaError_d != nullptr )
 		delete HandleClientLuaError_d;
@@ -436,7 +437,7 @@ GMOD_MODULE_CLOSE( )
 	// classic C one-liner to remove "useless" warnings.
 	(void)state;
 
-#if defined LUAERROR_SERVER
+#if defined LUAERROR2_SERVER
 
 	delete HandleClientLuaError_d;
 

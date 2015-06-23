@@ -3,87 +3,75 @@
 #include <lua.hpp>
 #include <symbolfinder.hpp>
 #include <detours.h>
-#include <cstdio>
-#include <cstdlib>
-#include <cstdarg>
 #include <string>
 #include <sstream>
 #include <vector>
 
 #if defined _WIN32
 
-	#define __CDECL __cdecl
-	#define __FASTCALL __fastcall
-	#define __THISCALL __thiscall
+#define FASTCALL __fastcall
+#define THISCALL __thiscall
 
-	#if defined LUAERROR2_SERVER
+#if defined LUAERROR2_SERVER
 
-		#define MAIN_BINARY_FILE "server.dll"
+static const char *main_binary = "server.dll";
 
-		#define PUSH_ENTITY_SYM "\x55\x8B\xEC\x83\xEC\x14\x83\x3D\x2A\x2A\x2A\x2A\x2A\x74\x2A\x8B"
-		#define PUSH_ENTITY_SYMLEN 16
+static const char *Push_Entity_sym = "\x55\x8B\xEC\x83\xEC\x14\x83\x3D\x2A\x2A\x2A\x2A\x2A\x74\x2A\x8B";
+static const size_t Push_Entity_symlen = 16;
 
-		#define HANDLECLIENTLUAERROR_SYM "\x55\x89\xE5\x57\x56\x8D\x7D\xE0\x53\x83\xEC\x4C\x65\xA1\x2A\x2A"
-		#define HANDLECLIENTLUAERROR_SYMLEN 16
+static const char *HandleClientLuaError_sym = "\x55\x89\xE5\x57\x56\x8D\x7D\xE0\x53\x83\xEC\x4C\x65\xA1\x2A\x2A";
+static const size_t HandleClientLuaError_symlen = 16;
 
-	#elif defined LUAERROR2_CLIENT
+#elif defined LUAERROR2_CLIENT
 
-		#define MAIN_BINARY_FILE "client.dll"
+static const char *main_binary = "client.dll";
 
-	#endif
+#endif
 
-	#define CLUAGAMECALLBACK__LUAERROR_SYM "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xDB\x53\x89"
-	#define CLUAGAMECALLBACK__LUAERROR_SYMLEN 16
+static const char *CLuaGameCallback__LuaError_sym = "\x55\x8B\xEC\x81\xEC\x2A\x2A\x2A\x2A\x53\x56\x57\x33\xDB\x53\x89";
+static const size_t CLuaGameCallback__LuaError_symlen = 16;
 
 #elif defined __linux
 
-	#define __CDECL __attribute__((cdecl))
+#if defined LUAERROR2_SERVER
 
-	#define SYMBOL_PREFIX "@"
+static const char *main_binary = "garrysmod/bin/server_srv.so";
 
-	#if defined LUAERROR2_SERVER
+static const char *Push_Entity_sym = "\x55\x89\xE5\x53\x83\xEC\x44\x8B\x15\x2A\x2A\x2A\x2A\x8B\x45\x08";
+static const size_t Push_Entity_symlen = 16;
 
-		#define MAIN_BINARY_FILE "garrysmod/bin/server_srv.so"
+static const char *HandleClientLuaError_sym = "\x55\x8B\xEC\x83\xEC\x08\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x53\x56";
+static const size_t HandleClientLuaError_symlen = 16;
 
-		#define PUSH_ENTITY_SYM "\x55\x89\xE5\x53\x83\xEC\x44\x8B\x15\x2A\x2A\x2A\x2A\x8B\x45\x08"
-		#define PUSH_ENTITY_SYMLEN 16
+#elif defined LUAERROR2_CLIENT
 
-		#define HANDLECLIENTLUAERROR_SYM "\x55\x8B\xEC\x83\xEC\x08\x8B\x0D\x2A\x2A\x2A\x2A\x8B\x11\x53\x56"
-		#define HANDLECLIENTLUAERROR_SYMLEN 16
+static const char *main_binary = "garrysmod/bin/client.so"
 
-	#elif defined LUAERROR2_CLIENT
+#endif
 
-		#define MAIN_BINARY_FILE "garrysmod/bin/client.so"
-
-	#endif
-
-	#define CLUAGAMECALLBACK__LUAERROR_SYM "\x55\x89\xE5\x57\x56\x8D\x45\xCF\x53\x81\xEC\x2A\x2A\x2A\x2A\x89"
-	#define CLUAGAMECALLBACK__LUAERROR_SYMLEN 16
+static const char *CLuaGameCallback__LuaError_sym = "\x55\x89\xE5\x57\x56\x8D\x45\xCF\x53\x81\xEC\x2A\x2A\x2A\x2A\x89";
+static const size_t CLuaGameCallback__LuaError_symlen = 16;
 
 #elif defined __APPLE__
 
-	#define __CDECL __attribute__((cdecl))
+#if defined LUAERROR2_SERVER
 
-	#define SYMBOL_PREFIX "@_"
+static const char *main_binary = "garrysmod/bin/server.dylib";
 
-	#if defined LUAERROR2_SERVER
+static const char *Push_Entity_sym = "@__Z11Push_EntityP11CBaseEntity";
+static const size_t Push_Entity_symlen = o;
 
-		#define MAIN_BINARY_FILE "garrysmod/bin/server.dylib"
+static const char *HandleClientLuaError_sym = "@__Z20HandleClientLuaErrorP11CBasePlayerPKc";
+static const size_t HandleClientLuaError_symlen = o;
 
-		#define PUSH_ENTITY_SYM SYMBOL_PREFIX "_Z11Push_EntityP11CBaseEntity"
-		#define PUSH_ENTITY_SYMLEN 0
+#elif defined LUAERROR2_CLIENT
 
-		#define HANDLECLIENTLUAERROR_SYM SYMBOL_PREFIX "_Z20HandleClientLuaErrorP11CBasePlayerPKc"
-		#define HANDLECLIENTLUAERROR_SYMLEN 0
+static const char *main_binary = "garrysmod/bin/client.dylib";
 
-	#elif defined LUAERROR2_CLIENT
+#endif
 
-		#define MAIN_BINARY_FILE "garrysmod/bin/client.dylib"
-
-	#endif
-
-	#define CLUAGAMECALLBACK__LUAERROR_SYM SYMBOL_PREFIX "_ZN16CLuaGameCallback8LuaErrorEP9CLuaError"
-	#define CLUAGAMECALLBACK__LUAERROR_SYMLEN 0
+static const char *CLuaGameCallback__LuaError_sym = "@__ZN16CLuaGameCallback8LuaErrorEP9CLuaErro";
+static const size_t CLuaGameCallback__LuaError_symlen = 16;
 
 #endif
 
@@ -102,7 +90,7 @@ typedef void ( *Push_Entity_t )( CBaseEntity *entity );
 
 static Push_Entity_t Push_Entity = nullptr;
 
-typedef void ( __CDECL *HandleClientLuaError_t )( CBasePlayer *player, const char *error );
+typedef void ( *HandleClientLuaError_t )( CBasePlayer *player, const char *error );
 
 static MologieDetours::Detour<HandleClientLuaError_t> *HandleClientLuaError_d = nullptr;
 static HandleClientLuaError_t HandleClientLuaError = nullptr;
@@ -123,7 +111,7 @@ LUA_FUNCTION_STATIC( ClientLuaErrorHookCall )
 	return 1;
 }
 
-static void __CDECL HandleClientLuaError_h( CBasePlayer *player, const char *error )
+static void HandleClientLuaError_h( CBasePlayer *player, const char *error )
 {
 	lua->PushCFunction( ClientLuaErrorHookCall );
 
@@ -146,11 +134,11 @@ static void __CDECL HandleClientLuaError_h( CBasePlayer *player, const char *err
 
 #if defined _WIN32
 
-typedef void ( __THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, std::string &error );
+typedef void ( THISCALL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, const std::string &error );
 
 #elif defined __linux || defined __APPLE__
 
-typedef void ( __CDECL *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, std::string &error );
+typedef void ( *CLuaGameCallback__LuaError_t )( CLuaGameCallback *callback, const std::string &error );
 
 #endif
 
@@ -317,11 +305,11 @@ LUA_FUNCTION_STATIC( LuaErrorHookCall )
 
 #if defined _WIN32
 
-static void __FASTCALL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, void *, std::string &error )
+static void FASTCALL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, void *, const std::string &error )
 
 #elif defined __linux || defined __APPLE__
 
-static void __CDECL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, std::string &error )
+static void CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, const std::string &error )
 
 #endif
 
@@ -354,8 +342,6 @@ static void __CDECL CLuaGameCallback__LuaError_h( CLuaGameCallback *callback, st
 		CLuaGameCallback__LuaError_d->GetOriginalFunction( )( callback, error );
 }
 
-#define LUA_ERROR( error ) return ( LUA->ThrowError( "Failed to load LuaError. '" error "' Contact me in Facepunch (danielga) or Steam (tuestu1) with this error." ), 0 );
-
 GMOD_MODULE_OPEN( )
 {
 	lua = reinterpret_cast<GarrysMod::Lua::ILuaInterface *>( LUA );
@@ -380,26 +366,26 @@ GMOD_MODULE_OPEN( )
 	}
 	else
 	{
-		LUA_ERROR( "Unable to detour AdvancedLuaErrorReporter." );
+		LUA->ThrowError( "unable to detour AdvancedLuaErrorReporter" );
 	}
 
 	SymbolFinder symfinder;
 
 #if defined LUAERROR2_SERVER
 
-	HandleClientLuaError = reinterpret_cast<HandleClientLuaError_t>( symfinder.ResolveOnBinary( MAIN_BINARY_FILE, HANDLECLIENTLUAERROR_SYM, HANDLECLIENTLUAERROR_SYMLEN ) );
+	HandleClientLuaError = reinterpret_cast<HandleClientLuaError_t>( symfinder.ResolveOnBinary( main_binary, HandleClientLuaError_sym, HandleClientLuaError_symlen ) );
 	if( HandleClientLuaError == nullptr )
-		LUA_ERROR( "Unable to sigscan function HandleClientLuaError (" MAIN_BINARY_FILE ")." );
+		LUA->ThrowError( "unable to sigscan function HandleClientLuaError" );
 
-	Push_Entity = reinterpret_cast<Push_Entity_t>( symfinder.ResolveOnBinary( MAIN_BINARY_FILE, PUSH_ENTITY_SYM, PUSH_ENTITY_SYMLEN ) );
+	Push_Entity = reinterpret_cast<Push_Entity_t>( symfinder.ResolveOnBinary( main_binary, Push_Entity_sym, Push_Entity_symlen ) );
 	if( Push_Entity == nullptr )
-		LUA_ERROR( "Unable to sigscan function Push_Entity (" MAIN_BINARY_FILE ")." );
+		LUA->ThrowError( "unable to sigscan function Push_Entity" );
 
 #endif
 
-	CLuaGameCallback__LuaError = reinterpret_cast<CLuaGameCallback__LuaError_t>( symfinder.ResolveOnBinary( MAIN_BINARY_FILE, CLUAGAMECALLBACK__LUAERROR_SYM, CLUAGAMECALLBACK__LUAERROR_SYMLEN ) );
+	CLuaGameCallback__LuaError = reinterpret_cast<CLuaGameCallback__LuaError_t>( symfinder.ResolveOnBinary( main_binary, CLuaGameCallback__LuaError_sym, CLuaGameCallback__LuaError_symlen ) );
 	if( CLuaGameCallback__LuaError == nullptr )
-		LUA_ERROR( "Unable to sigscan function CLuaGameCallback::LuaError (" MAIN_BINARY_FILE ")." );
+		LUA->ThrowError( "unable to sigscan function CLuaGameCallback::LuaError" );
 
 	try
 	{
@@ -416,8 +402,10 @@ GMOD_MODULE_OPEN( )
 
 		return 0;
 	}
-	catch( std::exception & )
-	{ }
+	catch( const std::exception &e )
+	{
+		LUA->PushString( e.what( ) );
+	}
 
 #if defined LUAERROR2_SERVER
 
@@ -429,7 +417,8 @@ GMOD_MODULE_OPEN( )
 	if( CLuaGameCallback__LuaError_d != nullptr )
 		delete CLuaGameCallback__LuaError_d;
 
-	LUA_ERROR( "Failed to detour function." );
+	LUA->ThrowError( LUA->GetString( -1 ) );
+	return 0;
 }
 
 GMOD_MODULE_CLOSE( )

@@ -1,6 +1,9 @@
 gm_luaerror2
 ============
 
+### Deprecated in favor of gm_luaerror (no more versioning on the name)
+### https://bitbucket.org/danielga/gm_luaerror
+
 A module for Garry's Mod that adds hooks for obtaining errors that happen on the client and server (if activated on server, it also pushes errors from clients).
 
 Info
